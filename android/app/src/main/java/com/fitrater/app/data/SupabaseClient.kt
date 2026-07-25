@@ -1,0 +1,98 @@
+@file:OptIn(io.github.jan.supabase.annotations.SupabaseInternal::class)
+
+package com.fitrater.app.data
+
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.FlowType
+import io.github.jan.supabase.auth.SettingsSessionManager
+import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.functions.Functions
+import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.realtime.Realtime
+import io.github.jan.supabase.serializer.KotlinXSerializer
+import io.github.jan.supabase.storage.Storage
+import io.ktor.client.plugins.HttpTimeout
+import kotlinx.serialization.json.Json
+
+object Supa {
+    const val URL: String = "https://ilrzqifdmjvooeyqvexd.supabase.co"
+
+    // Legacy anon JWT (supabase-kt v3 accepts publishable too, but this one is guaranteed).
+    const val ANON_KEY: String =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." +
+            "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlscnpxaWZkbWp2b29leXF2ZXhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODAzNzUsImV4cCI6MjA5OTk1NjM3NX0." +
+            "BfoEiMusmWwO4PAj7bD3aFDYNGdxCuXkqVSCySvRwvQ"
+
+    const val GOOGLE_WEB_CLIENT_ID: String =
+        "1062757466057-vngm8cbvrdjrra81sunt5ebi2rsf5u82.apps.googleusercontent.com"
+
+    const val AUTH_CALLBACK_URL: String = "com.fitrater.app://auth-callback"
+
+    // RevenueCat public Android SDK key. Get from RevenueCat dashboard →
+    // Project Settings → API Keys → "Public app-specific API keys" for the Android app.
+    // Format is `goog_...`. Replace before shipping the production AAB.
+    const val RC_ANDROID_API_KEY: String = "goog_tRCMTCDVJbHcQYWqvbfQBxgvaKi"
+
+    // Credit economics — must match RevenueCat product credit grants.
+    const val SIGNUP_CREDITS: Int = 100
+    const val SCORE_COST: Int = 5
+    const val GENERATE_COST: Int = 15
+    const val TRYON_COST: Int = 20
+    const val VERSUS_COST: Int = 8
+    const val ROAST_COST: Int = 5
+    const val DECODE_COST: Int = 10
+
+    // Trial abuse guard: annual sub in its 7-day INTRO period is capped to this many credits/day.
+    const val TRIAL_DAILY_CAP: Int = 20
+    // Play Store rating one-shot reward.
+    const val PLAY_RATING_REWARD: Int = 20
+
+    // SKU id -> credits granted mapping (client-side, source of truth).
+    val CREDIT_PACK_GRANTS: Map<String, Int> = mapOf(
+        "credits_100" to 100,       // Starter — $2.99
+        "credits_500" to 400,       // Popular — $9.99 (SKU id keeps historical name; grant is 400)
+        "credits_1500" to 1200,     // Pro — $29.99
+    )
+
+    // Sub monthly credit cap (fair-use).
+    const val SUB_MONTHLY_CAP: Int = 400
+    // Annual sub gives 3000/yr total (~250/mo) — enforced via monthly reset.
+    const val SUB_ANNUAL_MONTHLY_CAP: Int = 250
+
+    val client: SupabaseClient by lazy {
+        createSupabaseClient(supabaseUrl = URL, supabaseKey = ANON_KEY) {
+            // Ignore unknown DB columns so legacy fields on outfits/etc don't blow up deserialization.
+            defaultSerializer = KotlinXSerializer(Json {
+                ignoreUnknownKeys = true
+                explicitNulls = false
+                coerceInputValues = true
+            })
+            // Fal endpoints (nano-banana image gen, gemini vision scoring) can take 20–40s.
+            // Default ktor timeout is 15s → surface as request timeout in the UI. Bump to 120s.
+            httpConfig {
+                install(HttpTimeout) {
+                    requestTimeoutMillis = 120_000
+                    connectTimeoutMillis = 20_000
+                    socketTimeoutMillis = 120_000
+                }
+            }
+            install(Auth) {
+                flowType = FlowType.PKCE
+                scheme = "com.fitrater.app"
+                host = "auth-callback"
+                // Persist session to disk (SharedPreferences via multiplatform-settings-no-arg).
+                // Without this, supabase-kt v3 defaults to MemorySessionManager and the user
+                // must sign in on every cold launch.
+                sessionManager = SettingsSessionManager()
+                autoLoadFromStorage = true
+                autoSaveToStorage = true
+                alwaysAutoRefresh = true
+            }
+            install(Postgrest)
+            install(Storage)
+            install(Realtime)
+            install(Functions)
+        }
+    }
+}

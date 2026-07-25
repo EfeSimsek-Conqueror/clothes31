@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #F3EEE4;
+  --card: #F7F2E8;
+  --ink: #141210;
+  --muted: #6B6459;
+  --bronze: #B0743A;
+  --gold-1: #C99A5B;
+  --gold-2: #8C6033;
+  --line: rgba(20, 18, 16, 0.10);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-bronze: var(--bronze);
+  --color-gold-1: var(--gold-1);
+  --color-gold-2: var(--gold-2);
+  --color-line: var(--line);
+  --font-serif: var(--font-playfair), "Playfair Display", ui-serif, Georgia, serif;
+  --font-serif-warm: var(--font-fraunces), "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+html, body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Editorial small-caps eyebrow utility */
+.eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--bronze);
+  font-weight: 500;
+}
+
+.serif { font-family: var(--font-playfair), "Playfair Display", ui-serif, Georgia, serif; }
+.serif-warm { font-family: var(--font-fraunces), "Fraunces", ui-serif, Georgia, serif; }
+
+/* subtle grain for editorial paper feel */
+.paper-grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(20,18,16,0.035) 1px, transparent 1px);
+  background-size: 3px 3px;
+  mix-blend-mode: multiply;
+  opacity: 0.35;
+}
+
+/* thin dividing line consistent with editorial style */
+.hairline { border-color: var(--line); }
+
+/* Hide horizontal scrollbar visually while keeping accessibility */
+.scroll-x {
+  scrollbar-width: none;
+}
+.scroll-x::-webkit-scrollbar { display: none; }
+
+/* Segmented control */
+.seg-active {
+  background: var(--ink);
+  color: white;
+}

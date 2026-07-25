@@ -1,0 +1,49 @@
+# macOS
+.DS_Store
+
+# Secrets — NEVER commit
+**/.env
+**/.env.local
+**/.env.*.local
+**/keystore/
+**/keystore.properties
+**/*.jks
+**/*.keystore
+**/google-services.json
+**/GoogleService-Info.plist
+**/*service*account*.json
+**/*credentials*.json
+
+# Build outputs
+**/build/
+**/.gradle/
+**/dist/
+**/out/
+**/*.aab
+**/*.apk
+
+# iOS
+ios/**/xcuserdata/
+ios/**/*.xcworkspace
+ios/**/DerivedData/
+ios/Pods/
+ios/**/*.hmap
+ios/**/*.ipa
+
+# Node
+**/node_modules/
+**/.next/
+**/.turbo/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+.kotlin/
+
+# Store bundle output (release AAB)
+android/store/*.aab
+
+# Local
+local.properties
+*.log

@@ -1,0 +1,20 @@
+# Android build artifacts
+*.iml
+.gradle/
+/local.properties
+.idea/
+.DS_Store
+build/
+/captures
+.externalNativeBuild
+.cxx
+*.apk
+*.aab
+output.json
+
+# Release signing — never commit
+keystore/
+keystore.properties
+
+# Local Kotlin/Gradle caches
+.kotlin/

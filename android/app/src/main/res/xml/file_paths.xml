@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="cache_captures" path="captures/" />
+    <files-path name="files_captures" path="captures/" />
+    <external-cache-path name="ext_cache" path="." />
+    <external-files-path name="ext_files" path="." />
+    <cache-path name="exports_cache" path="exports/" />
+    <cache-path name="roasts_cache" path="roasts/" />
+    <cache-path name="versus_cache" path="versus/" />
+</paths>

@@ -1,0 +1,314 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AA010001000000000000FS01 /* FitScoreApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB010001000000000000FS01 /* FitScoreApp.swift */; };
+		AA010002000000000000FS01 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB010002000000000000FS01 /* DesignSystem.swift */; };
+		AA010003000000000000FS01 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB010003000000000000FS01 /* Models.swift */; };
+		AA010004000000000000FS01 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB010004000000000000FS01 /* SessionStore.swift */; };
+		AA010005000000000000FS01 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB010005000000000000FS01 /* RootView.swift */; };
+		AA010006000000000000FS01 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB010006000000000000FS01 /* SplashView.swift */; };
+		AA010007000000000000FS01 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB010007000000000000FS01 /* SignInView.swift */; };
+		AA010008000000000000FS01 /* OnboardingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB010008000000000000FS01 /* OnboardingViews.swift */; };
+		AA010009000000000000FS01 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB010009000000000000FS01 /* PaywallView.swift */; };
+		AA01000A000000000000FS01 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB01000A000000000000FS01 /* MainTabView.swift */; };
+		AA01000B000000000000FS01 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB01000B000000000000FS01 /* TodayView.swift */; };
+		AA01000C000000000000FS01 /* ScoreDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB01000C000000000000FS01 /* ScoreDetailView.swift */; };
+		AA01000D000000000000FS01 /* StudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB01000D000000000000FS01 /* StudioView.swift */; };
+		AA01000E000000000000FS01 /* JournalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB01000E000000000000FS01 /* JournalView.swift */; };
+		AA01000F000000000000FS01 /* YouView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB01000F000000000000FS01 /* YouView.swift */; };
+		AA010010000000000000FS01 /* ScoreLookSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB010010000000000000FS01 /* ScoreLookSheet.swift */; };
+		AA010011000000000000FS01 /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB010011000000000000FS01 /* SupabaseClient.swift */; };
+		AA010012000000000000FS01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB010012000000000000FS01 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		BB010001000000000000FS01 /* FitScoreApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitScoreApp.swift; sourceTree = "<group>"; };
+		BB010002000000000000FS01 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		BB010003000000000000FS01 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		BB010004000000000000FS01 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
+		BB010005000000000000FS01 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		BB010006000000000000FS01 /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
+		BB010007000000000000FS01 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
+		BB010008000000000000FS01 /* OnboardingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViews.swift; sourceTree = "<group>"; };
+		BB010009000000000000FS01 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		BB01000A000000000000FS01 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		BB01000B000000000000FS01 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		BB01000C000000000000FS01 /* ScoreDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreDetailView.swift; sourceTree = "<group>"; };
+		BB01000D000000000000FS01 /* StudioView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioView.swift; sourceTree = "<group>"; };
+		BB01000E000000000000FS01 /* JournalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalView.swift; sourceTree = "<group>"; };
+		BB01000F000000000000FS01 /* YouView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouView.swift; sourceTree = "<group>"; };
+		BB010010000000000000FS01 /* ScoreLookSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreLookSheet.swift; sourceTree = "<group>"; };
+		BB010011000000000000FS01 /* SupabaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseClient.swift; sourceTree = "<group>"; };
+		BB010012000000000000FS01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BB010013000000000000FS01 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BB010099000000000000FS01 /* FitScore.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FitScore.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		CC010001000000000000FS01 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		DD010001000000000000FS01 = {
+			isa = PBXGroup;
+			children = (
+				DD010002000000000000FS01 /* FitScore */,
+				DD010003000000000000FS01 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		DD010002000000000000FS01 /* FitScore */ = {
+			isa = PBXGroup;
+			children = (
+				BB010001000000000000FS01 /* FitScoreApp.swift */,
+				BB010002000000000000FS01 /* DesignSystem.swift */,
+				BB010003000000000000FS01 /* Models.swift */,
+				BB010004000000000000FS01 /* SessionStore.swift */,
+				BB010005000000000000FS01 /* RootView.swift */,
+				BB010006000000000000FS01 /* SplashView.swift */,
+				BB010007000000000000FS01 /* SignInView.swift */,
+				BB010008000000000000FS01 /* OnboardingViews.swift */,
+				BB010009000000000000FS01 /* PaywallView.swift */,
+				BB01000A000000000000FS01 /* MainTabView.swift */,
+				BB01000B000000000000FS01 /* TodayView.swift */,
+				BB01000C000000000000FS01 /* ScoreDetailView.swift */,
+				BB01000D000000000000FS01 /* StudioView.swift */,
+				BB01000E000000000000FS01 /* JournalView.swift */,
+				BB01000F000000000000FS01 /* YouView.swift */,
+				BB010010000000000000FS01 /* ScoreLookSheet.swift */,
+				BB010011000000000000FS01 /* SupabaseClient.swift */,
+				BB010012000000000000FS01 /* Assets.xcassets */,
+				BB010013000000000000FS01 /* Info.plist */,
+			);
+			path = FitScore;
+			sourceTree = "<group>";
+		};
+		DD010003000000000000FS01 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BB010099000000000000FS01 /* FitScore.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		EE010001000000000000FS01 /* FitScore */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FF010002000000000000FS01 /* Build configuration list for PBXNativeTarget "FitScore" */;
+			buildPhases = (
+				CC010002000000000000FS01 /* Sources */,
+				CC010001000000000000FS01 /* Frameworks */,
+				CC010003000000000000FS01 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = FitScore;
+			productName = FitScore;
+			productReference = BB010099000000000000FS01 /* FitScore.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		EE010099000000000000FS01 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					EE010001000000000000FS01 = { CreatedOnToolsVersion = 15.0; };
+				};
+			};
+			buildConfigurationList = FF010001000000000000FS01 /* Build configuration list for PBXProject "FitScore" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = ( en, Base, );
+			mainGroup = DD010001000000000000FS01;
+			productRefGroup = DD010003000000000000FS01 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = ( EE010001000000000000FS01 /* FitScore */, );
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CC010003000000000000FS01 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA010012000000000000FS01 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		CC010002000000000000FS01 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA010001000000000000FS01 /* FitScoreApp.swift in Sources */,
+				AA010002000000000000FS01 /* DesignSystem.swift in Sources */,
+				AA010003000000000000FS01 /* Models.swift in Sources */,
+				AA010004000000000000FS01 /* SessionStore.swift in Sources */,
+				AA010005000000000000FS01 /* RootView.swift in Sources */,
+				AA010006000000000000FS01 /* SplashView.swift in Sources */,
+				AA010007000000000000FS01 /* SignInView.swift in Sources */,
+				AA010008000000000000FS01 /* OnboardingViews.swift in Sources */,
+				AA010009000000000000FS01 /* PaywallView.swift in Sources */,
+				AA01000A000000000000FS01 /* MainTabView.swift in Sources */,
+				AA01000B000000000000FS01 /* TodayView.swift in Sources */,
+				AA01000C000000000000FS01 /* ScoreDetailView.swift in Sources */,
+				AA01000D000000000000FS01 /* StudioView.swift in Sources */,
+				AA01000E000000000000FS01 /* JournalView.swift in Sources */,
+				AA01000F000000000000FS01 /* YouView.swift in Sources */,
+				AA010010000000000000FS01 /* ScoreLookSheet.swift in Sources */,
+				AA010011000000000000FS01 /* SupabaseClient.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		FF010010000000000000FS01 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ( "DEBUG=1", "$(inherited)", );
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		FF010011000000000000FS01 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		FF010020000000000000FS01 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = FitScore/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = ( "$(inherited)", "@executable_path/Frameworks", );
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fitscore.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		FF010021000000000000FS01 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = FitScore/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = ( "$(inherited)", "@executable_path/Frameworks", );
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fitscore.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		FF010001000000000000FS01 /* Build configuration list for PBXProject "FitScore" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FF010010000000000000FS01 /* Debug */,
+				FF010011000000000000FS01 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FF010002000000000000FS01 /* Build configuration list for PBXNativeTarget "FitScore" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FF010020000000000000FS01 /* Debug */,
+				FF010021000000000000FS01 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = EE010099000000000000FS01 /* Project object */;
+}

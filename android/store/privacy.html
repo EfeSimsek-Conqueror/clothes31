@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fitrater — Privacy Policy</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --paper: #F3EEE4;
+    --ink: #141210;
+    --muted: #6B6560;
+    --bronze: #B0743A;
+    --hairline: #DFD6C7;
+  }
+  html, body { background: var(--paper); color: var(--ink); margin: 0; padding: 0; }
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    line-height: 1.55;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+    font-size: 17px;
+  }
+  h1 { font-size: 34px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 8px; }
+  h2 { font-size: 21px; font-weight: 600; margin: 40px 0 8px; }
+  h3 { font-size: 16px; font-weight: 600; margin: 24px 0 6px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--bronze); }
+  .kicker { text-transform: uppercase; letter-spacing: 2px; font-size: 12px; color: var(--bronze); font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; }
+  .divider { border: none; border-top: 1px solid var(--hairline); margin: 32px 0; }
+  ul { padding-left: 22px; }
+  li { margin: 4px 0; }
+  a { color: var(--bronze); }
+  .eff { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  code { background: #EBE3D3; padding: 1px 6px; border-radius: 4px; font-size: 14px; }
+</style>
+</head>
+<body>
+  <div class="kicker">Fitrater</div>
+  <h1>Privacy Policy</h1>
+  <div class="eff">Effective July 24, 2026</div>
+
+  <p>Fitrater is a fashion journal and outfit-scoring app. This policy explains what we collect, why, and what you can do about it. Written plainly, no dark patterns.</p>
+
+  <h2>Who runs Fitrater</h2>
+  <p>Fitrater is operated by Cloudgeng, based in Istanbul, Turkey. Contact: <a href="mailto:efe@cloudgeng.com">efe@cloudgeng.com</a>.</p>
+
+  <hr class="divider">
+
+  <h2>What we collect</h2>
+  <ul>
+    <li><b>Account:</b> email address and display name from Google Sign-In.</li>
+    <li><b>Style profile:</b> gender, style tags, preferred fabrics and colors, sensitivities, honesty preference — everything you enter in the app.</li>
+    <li><b>Outfit photos:</b> images you upload for scoring, stored on our servers so Hem (the AI stylist) can score them and so you can revisit them.</li>
+    <li><b>Generated pieces:</b> images produced by the AI Studio and any reference images you attach.</li>
+    <li><b>Credit transactions:</b> a running ledger of credits earned, spent, or purchased.</li>
+    <li><b>Weather context:</b> when you score a look we may fetch the day's weather. We use Open-Meteo with a fixed default location (Istanbul) unless you grant precise location permission, in which case your device's coordinates are used <i>only</i> for that request and never stored.</li>
+    <li><b>Device technical data:</b> crash logs and error diagnostics (locally logged, sent only if you contact support).</li>
+  </ul>
+
+  <h2>What we do <i>not</i> collect</h2>
+  <ul>
+    <li>We do not track you across other apps or websites.</li>
+    <li>We do not use advertising SDKs.</li>
+    <li>We do not sell personal data. Ever.</li>
+    <li>We do not read your camera roll — only the specific image you pick.</li>
+  </ul>
+
+  <hr class="divider">
+
+  <h2>How we use it</h2>
+  <ul>
+    <li><b>Score a look:</b> your outfit image is sent to <b>Fal.ai</b> (which routes to Google Gemini for vision analysis and to nano-banana models for image generation). Fal returns a score, verdict, sub-scores, and Hem's comment. That result is written back to your Fitrater account.</li>
+    <li><b>Design a piece:</b> prompts and reference images you supply are sent to <b>Fal.ai</b> to generate garment renders.</li>
+    <li><b>Store your history:</b> your outfits, closet pieces, credit ledger, style profile, and Hem's notes are stored in <b>Supabase</b> (Postgres + Storage), region <code>eu-central-1</code> (Frankfurt, Germany).</li>
+    <li><b>Billing:</b> in-app purchases are processed by <b>Google Play Billing</b> and reconciled via <b>RevenueCat</b>. Neither Fitrater nor Supabase sees your payment card.</li>
+    <li><b>Improve the app:</b> we look at aggregated, non-identifying signals (e.g., "how many looks were scored this week"). No profiles are built from your data for advertising or research.</li>
+  </ul>
+
+  <hr class="divider">
+
+  <h2>Third parties</h2>
+  <ul>
+    <li><b>Google</b> — Sign-In (identity) and Play Billing (payment). See <a href="https://policies.google.com/privacy">policies.google.com/privacy</a>.</li>
+    <li><b>RevenueCat</b> — subscription and purchase reconciliation. See <a href="https://www.revenuecat.com/privacy/">revenuecat.com/privacy</a>.</li>
+    <li><b>Fal.ai</b> — AI inference. Your prompts and images are sent to Fal for the duration of a request; Fitrater does not authorize Fal to retain them for training. See <a href="https://fal.ai/privacy-policy">fal.ai/privacy-policy</a>.</li>
+    <li><b>Supabase</b> — hosting, database, object storage. See <a href="https://supabase.com/privacy">supabase.com/privacy</a>.</li>
+    <li><b>Open-Meteo</b> — weather API. No PII is sent — just latitude/longitude (Istanbul by default). See <a href="https://open-meteo.com/en/terms">open-meteo.com/en/terms</a>.</li>
+  </ul>
+
+  <hr class="divider">
+
+  <h2>How long we keep it</h2>
+  <p>Until you delete it. Outfits, pieces, notes, and profile data live until you delete them individually or delete your account. When you delete the account, we wipe all rows we own for you and remove your photos from storage. Credit ledger entries associated with real money are retained for tax record-keeping for up to seven years, but personal identifiers are stripped after account deletion.</p>
+
+  <h2>Your rights</h2>
+  <ul>
+    <li><b>Export:</b> You → Help &amp; Privacy → Export my data — produces a JSON file with everything we hold for you.</li>
+    <li><b>Delete:</b> You → Help &amp; Privacy → Delete account — irreversibly removes your data.</li>
+    <li><b>Correction / questions:</b> email <a href="mailto:efe@cloudgeng.com">efe@cloudgeng.com</a>. We reply within 30 days.</li>
+    <li><b>EU / UK residents:</b> you have the right to lodge a complaint with your local data protection authority.</li>
+  </ul>
+
+  <hr class="divider">
+
+  <h2>Children</h2>
+  <p>Fitrater is intended for people aged 13 and up. We do not knowingly collect data from anyone under 13. If you believe a child under 13 has signed up, email us and we will remove the account.</p>
+
+  <h2>Security</h2>
+  <p>All traffic is TLS-encrypted. Your outfit and closet photos are stored in access-scoped Supabase Storage buckets (per-user folders enforced by row-level security). We rotate API keys after any incident. No system is perfect — we recommend not uploading images you would not be comfortable seeing on a personal cloud drive.</p>
+
+  <h2>International transfers</h2>
+  <p>Your data is stored in the EU (Frankfurt). AI inference at Fal.ai may take place in the United States. By using Fitrater you consent to this transfer.</p>
+
+  <h2>Changes</h2>
+  <p>If we materially change this policy we will post the new version at <a href="https://fitrater.ai/privacy">fitrater.ai/privacy</a> and update the effective date above. We will notify signed-in users in the app for anything significant.</p>
+
+  <h2>Contact</h2>
+  <p><a href="mailto:efe@cloudgeng.com">efe@cloudgeng.com</a></p>
+</body>
+</html>
