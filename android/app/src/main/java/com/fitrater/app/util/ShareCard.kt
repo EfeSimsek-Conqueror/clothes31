@@ -13,6 +13,7 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 import java.util.UUID
 
 object ShareCard {
@@ -115,8 +116,8 @@ object ShareCard {
         val cxB = 48f + boxW + 32f + boxW / 2f
         c.drawText("A", cxA, scoreY - 90, labelPaint)
         c.drawText("B", cxB, scoreY - 90, labelPaint)
-        c.drawText(String.format("%.1f", scoreA), cxA, scoreY, scorePaint)
-        c.drawText(String.format("%.1f", scoreB), cxB, scoreY, scorePaint)
+        c.drawText(String.format(Locale.US, "%.1f", scoreA), cxA, scoreY, scorePaint)
+        c.drawText(String.format(Locale.US, "%.1f", scoreB), cxB, scoreY, scorePaint)
 
         // Winner badge
         if (winner == "A" || winner == "B") {

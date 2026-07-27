@@ -66,6 +66,7 @@ import com.fitrater.app.ui.theme.HemType
 import com.fitrater.app.ui.theme.PrimaryButton
 import com.fitrater.app.ui.theme.PullQuote
 import com.fitrater.app.ui.theme.ScoreChip
+import java.util.Locale
 import kotlin.math.abs
 
 @Composable
@@ -225,8 +226,8 @@ fun ScoreDetailScreen(outfitId: String, onScoreALook: () -> Unit, onClose: () ->
                 val delta = if (avg != null && score != null) score - avg else null
                 val deltaText = when {
                     delta == null -> null
-                    delta > 0 -> String.format("%.1f above your average", delta)
-                    delta < 0 -> String.format("%.1f below your average", abs(delta))
+                    delta > 0 -> String.format(Locale.US, "%.1f above your average", delta)
+                    delta < 0 -> String.format(Locale.US, "%.1f below your average", abs(delta))
                     else -> "on your average"
                 }
                 val subline = listOfNotNull(deltaText, o?.occasion?.uppercase()).joinToString(" · ")
@@ -264,7 +265,7 @@ fun ScoreDetailScreen(outfitId: String, onScoreALook: () -> Unit, onClose: () ->
                             ) {
                                 Text(label, style = HemType.body, modifier = Modifier.weight(1f))
                                 Text(
-                                    String.format("%.1f / 10", value),
+                                    String.format(Locale.US, "%.1f / 10", value),
                                     style = HemType.body.copy(fontSize = 14.sp),
                                 )
                             }

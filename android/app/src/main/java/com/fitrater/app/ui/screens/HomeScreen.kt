@@ -408,8 +408,8 @@ private fun sublineForOutfit(outfit: Outfit, avg: Double?): String {
             val delta = if (avg != null && outfit.score != null) outfit.score - avg else null
             val deltaText = when {
                 delta == null -> null
-                delta > 0 -> String.format("%.1f above your average", delta)
-                delta < 0 -> String.format("%.1f below your average", abs(delta))
+                delta > 0 -> String.format(Locale.US, "%.1f above your average", delta)
+                delta < 0 -> String.format(Locale.US, "%.1f below your average", abs(delta))
                 else -> "on your average"
             }
             listOfNotNull(deltaText, outfit.occasion?.uppercase()).joinToString(" · ")

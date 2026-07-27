@@ -35,6 +35,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fitrater.app.R
+import java.util.Locale
 
 /** Palette from the design brief. */
 object HemColors {
@@ -183,7 +184,7 @@ fun ScoreChip(score: Double, modifier: Modifier = Modifier) {
             .padding(horizontal = 14.dp, vertical = 6.dp),
     ) {
         Text(
-            text = String.format("%.1f", score),
+            text = String.format(Locale.US, "%.1f", score),
             style = TextStyle(
                 fontFamily = SerifFamily,
                 fontSize = 22.sp,

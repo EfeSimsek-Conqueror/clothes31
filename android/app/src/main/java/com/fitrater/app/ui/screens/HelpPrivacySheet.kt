@@ -200,7 +200,7 @@ fun HelpPrivacySheetContent(
 
         Spacer(Modifier.height(HemSpace.xl))
         Text(
-            "Questions? support@fitrater.com",
+            "Questions? efe@cloudgeng.com",
             style = HemType.bodyMuted.copy(fontSize = 13.sp),
         )
         Spacer(Modifier.height(HemSpace.xl))
