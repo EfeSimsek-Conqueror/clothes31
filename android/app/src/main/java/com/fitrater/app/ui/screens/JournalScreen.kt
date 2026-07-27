@@ -314,7 +314,8 @@ fun JournalScreen(onOpenDetail: (String) -> Unit = {}) {
             }
 
             MonthSummaryCard(
-                monthLabel = "${enMonthName(now.monthValue).take(3).uppercase()} ${now.year.toString().takeLast(2)}",
+                // Full year — "JUL 26" read as July 26th.
+                monthLabel = "${enMonthName(now.monthValue).take(3).uppercase()} ${now.year}",
                 sparkline = spark,
                 avg = avgThis,
                 delta = delta,

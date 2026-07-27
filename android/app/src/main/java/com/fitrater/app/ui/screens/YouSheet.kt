@@ -345,6 +345,22 @@ fun YouSheetContent(
         // Growth loop: one-shot Play rating reward.
         val ratedOk = profile?.rated_ok == true
         var rateBusy by remember { mutableStateOf(false) }
+        // Persist the "already rated" flag FIRST — if that write fails the reward is not
+        // granted, otherwise the user could collect it again on the next attempt.
+        val grantRatingReward = {
+            scope.launch {
+                if (Repo.markRatedOk()) {
+                    runCatching { Repo.addCredits(Supa.PLAY_RATING_REWARD, "play_rating") }
+                    profile = profile?.copy(rated_ok = true)
+                        ?: com.fitrater.app.data.model.Profile(rated_ok = true)
+                    ToastBus.post("${Supa.PLAY_RATING_REWARD} credits added — thanks.")
+                } else {
+                    ToastBus.post("Couldn't record that just now — try again in a moment.")
+                }
+                rateBusy = false
+            }
+            Unit
+        }
         RateOnPlayRow(
             alreadyRated = ratedOk,
             busy = rateBusy,
@@ -360,25 +376,11 @@ fun YouSheetContent(
                 manager.requestReviewFlow().addOnCompleteListener { req ->
                     if (req.isSuccessful) {
                         manager.launchReviewFlow(activity, req.result).addOnCompleteListener {
-                            scope.launch {
-                                runCatching { Repo.addCredits(Supa.PLAY_RATING_REWARD, "play_rating") }
-                                runCatching { Repo.markRatedOk() }
-                                profile = profile?.copy(rated_ok = true)
-                                    ?: com.fitrater.app.data.model.Profile(rated_ok = true)
-                                rateBusy = false
-                                ToastBus.post("${Supa.PLAY_RATING_REWARD} credits added — thanks.")
-                            }
+                            grantRatingReward()
                         }
                     } else {
                         // Play unavailable (sideload, no Play Services) — grant anyway to unblock the reward.
-                        scope.launch {
-                            runCatching { Repo.addCredits(Supa.PLAY_RATING_REWARD, "play_rating") }
-                            runCatching { Repo.markRatedOk() }
-                            profile = profile?.copy(rated_ok = true)
-                                ?: com.fitrater.app.data.model.Profile(rated_ok = true)
-                            rateBusy = false
-                            ToastBus.post("${Supa.PLAY_RATING_REWARD} credits added — thanks.")
-                        }
+                        grantRatingReward()
                     }
                 }
             },

@@ -158,7 +158,10 @@ fun HomeScreen(
         Spacer(Modifier.height(HemSpace.lg))
 
         // Low credits nudge — renders only when balance < 30 and not dismissed today.
-        com.fitrater.app.ui.components.LowCreditsBanner(onOpenCredits = onOpenCredits)
+        // Suppressed on first run so it can't stack above the onboarding banner.
+        if (!isFirstRun) {
+            com.fitrater.app.ui.components.LowCreditsBanner(onOpenCredits = onOpenCredits)
+        }
 
         if (!hemNoteBody.isNullOrBlank() && !isFirstRun) {
             HemMorningCard(hemNoteBody!!)

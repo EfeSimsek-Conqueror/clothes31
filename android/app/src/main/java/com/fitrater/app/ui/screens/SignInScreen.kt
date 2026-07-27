@@ -43,6 +43,7 @@ import com.fitrater.app.ui.theme.HemType
 import com.fitrater.app.ui.theme.OutlinedPill
 import com.fitrater.app.ui.theme.PrimaryButton
 import com.fitrater.app.ui.theme.SerifDisplay
+import com.fitrater.app.util.userMessage
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.OTP
 import kotlinx.coroutines.launch
@@ -98,7 +99,7 @@ fun SignInScreen(onAuthed: () -> Unit) {
                         }
                         onAuthed()
                     }.onFailure {
-                        error = it.message ?: "Google sign-in failed"
+                        error = it.userMessage("Google sign-in failed. Please try again.")
                     }
                     busy = false
                 }
@@ -204,7 +205,7 @@ fun SignInScreen(onAuthed: () -> Unit) {
                                         email = em
                                     }
                                 }.onSuccess { emailSent = true }
-                                    .onFailure { error = it.message ?: "Failed to send link" }
+                                    .onFailure { error = it.userMessage("Couldn't send the link. Please try again.") }
                                 busy = false
                             }
                         },

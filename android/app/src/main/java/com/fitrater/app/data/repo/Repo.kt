@@ -84,7 +84,6 @@ object Repo {
         return runCatching {
             db["closet_items"].select(Columns.list("id")) {
                 filter { eq("user_id", uid) }
-                limit(1)
             }.decodeList<ClosetItem>().size
         }.getOrDefault(0)
     }
@@ -399,11 +398,12 @@ object Repo {
     }
 
     /** Mark the profile.rated_ok flag so we never grant the Play-rating credits twice. */
-    suspend fun markRatedOk() {
-        val uid = userId ?: return
-        runCatching {
+    /** Returns true only if the flag was actually persisted — callers gate the reward on it. */
+    suspend fun markRatedOk(): Boolean {
+        val uid = userId ?: return false
+        return runCatching {
             db["profiles"].update({ set("rated_ok", true) }) { filter { eq("id", uid) } }
-        }
+        }.isSuccess
     }
 
     /** Credit a positive [amount] to the current user. Used after successful IAP purchase. */
