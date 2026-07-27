@@ -55,6 +55,7 @@ import com.fitrater.app.util.CreditsGate
 import com.fitrater.app.util.GateResult
 import com.fitrater.app.util.ShareCard
 import com.fitrater.app.util.ToastBus
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -413,7 +414,7 @@ private fun WinnerCard(
             Text(label, style = HemType.smallLabel.copy(color = HemColors.Muted, letterSpacing = 2.sp))
             Spacer(Modifier.fillMaxWidth().weight(1f, fill = false))
             Text(
-                score?.let { String.format("%.1f", it) } ?: "–",
+                score?.let { String.format(Locale.US, "%.1f", it) } ?: "–",
                 style = HemType.serifSection.copy(fontSize = 22.sp, fontWeight = FontWeight.Medium),
             )
         }

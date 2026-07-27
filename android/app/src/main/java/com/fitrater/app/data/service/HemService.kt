@@ -9,6 +9,7 @@ import com.fitrater.app.data.model.Subscores
 import io.github.jan.supabase.functions.functions
 import io.ktor.client.call.body
 import io.ktor.client.statement.HttpResponse
+import java.util.Locale
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -74,7 +75,7 @@ object HemService {
         val swaps = parsed.swaps.orEmpty()
         val annotations = parsed.annotations.orEmpty()
         return HemScored(
-            score = String.format("%.1f", s).toDouble(),
+            score = String.format(Locale.US, "%.1f", s).toDouble(),
             hemComment = comment,
             subscores = subs,
             swaps = swaps,
@@ -102,8 +103,8 @@ object HemService {
             ScorePiece("Footwear", score - 0.4, "Palette-friendly, low-drama."),
         )
         return ScoreResult(
-            score = String.format("%.1f", score).toDouble(),
-            deltaVsAvg = String.format("%.1f", delta).toDouble(),
+            score = String.format(Locale.US, "%.1f", score).toDouble(),
+            deltaVsAvg = String.format(Locale.US, "%.1f", delta).toDouble(),
             occasion = occasion,
             pullQuote = quote,
             pieces = pieces,
