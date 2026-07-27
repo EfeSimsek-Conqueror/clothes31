@@ -219,25 +219,29 @@ fun StudioScreen(
             Text(error!!, style = HemType.bodyMuted.copy(color = Color(0xFFB0743A)))
             Spacer(Modifier.height(HemSpace.sm))
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(HemSpace.sm)) {
-            StudioActionCard(
-                title = "+ Create New",
-                subtitle = "Guided AI design",
-                modifier = Modifier.weight(1f),
-                onClick = onCreateNew,
-            )
-            StudioActionCard(
-                title = if (busy) "Uploading…" else "↑ Import",
-                subtitle = "Photo or icon",
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    if (!busy) {
-                        pickLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                        )
-                    }
-                },
-            )
+        // The empty state already offers Import and Create as its own two cards — showing
+        // these as well gave four cards for two actions.
+        if (items.isNotEmpty()) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(HemSpace.sm)) {
+                StudioActionCard(
+                    title = "+ Create New",
+                    subtitle = "Guided AI design",
+                    modifier = Modifier.weight(1f),
+                    onClick = onCreateNew,
+                )
+                StudioActionCard(
+                    title = if (busy) "Uploading…" else "↑ Import",
+                    subtitle = "Photo or icon",
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        if (!busy) {
+                            pickLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                            )
+                        }
+                    },
+                )
+            }
         }
         Spacer(Modifier.height(HemSpace.xl))
     }

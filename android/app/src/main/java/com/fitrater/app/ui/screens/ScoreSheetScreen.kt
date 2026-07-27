@@ -53,6 +53,7 @@ import com.fitrater.app.ui.theme.HemSpace
 import com.fitrater.app.ui.theme.HemType
 import com.fitrater.app.ui.theme.PrimaryButton
 import com.fitrater.app.ui.theme.SerifDisplay
+import com.fitrater.app.util.userMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -275,8 +276,8 @@ fun ScoreSheetScreen(
                             onScored(id)
                         }.onFailure {
                             Log.e("Score", "score failed", it)
-                            error = it.message ?: "Something went wrong"
-                            com.fitrater.app.util.ToastBus.post("Scoring failed: ${it.message ?: "error"}")
+                            error = it.userMessage("Scoring failed. Please try again.")
+                            com.fitrater.app.util.ToastBus.post(error!!)
                             busy = false
                         }
                     }
