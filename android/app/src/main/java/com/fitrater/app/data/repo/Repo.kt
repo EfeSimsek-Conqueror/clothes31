@@ -1,6 +1,21 @@
 package com.fitrater.app.data.repo
 
 import com.fitrater.app.data.Supa
+import com.fitrater.app.data.model.BodyProfile
+import com.fitrater.app.data.model.BodyProfileResponse
+import com.fitrater.app.data.model.DecodeInvitationResponse
+import com.fitrater.app.data.model.InvitationDecoded
+import com.fitrater.app.data.model.InvitationRead
+import com.fitrater.app.data.model.OutfitCombo
+import com.fitrater.app.data.model.SuggestOutfitsResponse
+import com.fitrater.app.data.model.ComposeCoverResponse
+import com.fitrater.app.data.model.HeadlineResponse
+import com.fitrater.app.data.model.MagazineCover
+import com.fitrater.app.data.model.FitHotspot
+import com.fitrater.app.data.model.FitMap
+import com.fitrater.app.data.model.MarkupAnnotation
+import com.fitrater.app.data.model.MarkupCoords
+import com.fitrater.app.data.model.TranscribeResponse
 import com.fitrater.app.data.model.ClosetItem
 import com.fitrater.app.data.model.ClosetItemInsert
 import com.fitrater.app.data.model.CreditPack
@@ -27,8 +42,12 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.addJsonObject
 import kotlin.time.Duration.Companion.hours
 
 @Serializable
@@ -439,6 +458,115 @@ object Repo {
             .getOrElse { GenerateResponse(error = text.take(200)) }
     }
 
+    /**
+     * One-time body calibration. Sends the front (and optional side) photo
+     * URLs to the `analyze-body` edge function and returns a [BodyProfileResponse]
+     * used to personalize future ratings.
+     */
+    suspend fun analyzeBody(frontUrl: String, sideUrl: String?): BodyProfileResponse {
+        val payload: JsonObject = buildJsonObject {
+            put("front_url", frontUrl)
+            if (sideUrl != null) put("side_url", sideUrl)
+        }
+        val resp: HttpResponse = functions.invoke(function = "analyze-body", body = payload)
+        val text: String = resp.body()
+        val json = Json { ignoreUnknownKeys = true }
+        return runCatching { json.decodeFromString(BodyProfileResponse.serializer(), text) }
+            .getOrElse { BodyProfileResponse(error = text.take(200)) }
+    }
+
+    // ---- Sprint 2: transcribe-intent + annotation/fit-map persistence ----
+
+    /**
+     * Call the `transcribe-intent` edge function with a signed audio URL and
+     * return the raw + sanitized transcript from Fal wizper. Errors are
+     * flattened into [TranscribeResponse.error] rather than thrown, matching
+     * the other edge-function wrappers.
+     */
+    suspend fun transcribeIntent(audioUrl: String): TranscribeResponse {
+        val payload: JsonObject = buildJsonObject { put("audio_url", audioUrl) }
+        val resp: HttpResponse = functions.invoke(function = "transcribe-intent", body = payload)
+        val text: String = resp.body()
+        val json = Json { ignoreUnknownKeys = true }
+        return runCatching { json.decodeFromString(TranscribeResponse.serializer(), text) }
+            .getOrElse { TranscribeResponse(error = text.take(200)) }
+    }
+
+    /**
+     * Batch-replace markup annotations for an outfit. Existing rows are
+     * deleted first so this is a full replace. RLS policy `own_annotations`
+     * enforces ownership.
+     */
+    suspend fun saveAnnotations(outfitId: String, annotations: List<MarkupAnnotation>) {
+        runCatching {
+            db["outfit_annotations"].delete { filter { eq("outfit_id", outfitId) } }
+        }
+        if (annotations.isEmpty()) return
+        @Serializable
+        data class Row(
+            val outfit_id: String,
+            val type: String,
+            val coords: MarkupCoords,
+            val note: String? = null,
+            val confidence: Double? = null,
+            val idx: Int,
+        )
+        val rows = annotations.mapIndexed { i, a ->
+            Row(outfit_id = outfitId, type = a.type, coords = a.coords, note = a.note, confidence = a.confidence, idx = i)
+        }
+        db["outfit_annotations"].insert(rows)
+    }
+
+    /** Upsert the fit-tension heatmap for an outfit (one row per outfit). */
+    suspend fun saveFitMap(outfitId: String, map: FitMap) {
+        @Serializable
+        data class Row(
+            val outfit_id: String,
+            val resolution: List<Int>? = null,
+            val grid: List<List<Double>>? = null,
+            val hotspots: List<FitHotspot>? = null,
+        )
+        val row = Row(outfit_id = outfitId, resolution = map.resolution, grid = map.grid, hotspots = map.hotspots)
+        db["outfit_fit_maps"].upsert(row) { onConflict = "outfit_id" }
+    }
+
+    /** Load ordered markup annotations for an outfit. */
+    suspend fun loadAnnotations(outfitId: String): List<MarkupAnnotation> {
+        @Serializable
+        data class Row(
+            val type: String,
+            val coords: MarkupCoords,
+            val note: String? = null,
+            val confidence: Double? = null,
+            val idx: Int? = null,
+        )
+        return runCatching {
+            db["outfit_annotations"].select(Columns.list("type", "coords", "note", "confidence", "idx")) {
+                filter { eq("outfit_id", outfitId) }
+                order("idx", Order.ASCENDING)
+            }.decodeList<Row>().map {
+                MarkupAnnotation(type = it.type, coords = it.coords, note = it.note ?: "", confidence = it.confidence)
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    /** Load a single fit-map row for an outfit, or null if none. */
+    suspend fun loadFitMap(outfitId: String): FitMap? {
+        @Serializable
+        data class Row(
+            val resolution: List<Int>? = null,
+            val grid: List<List<Double>>? = null,
+            val hotspots: List<FitHotspot>? = null,
+        )
+        val row = runCatching {
+            db["outfit_fit_maps"].select(Columns.list("resolution", "grid", "hotspots")) {
+                filter { eq("outfit_id", outfitId) }
+                limit(1)
+            }.decodeSingleOrNull<Row>()
+        }.getOrNull() ?: return null
+        return FitMap(resolution = row.resolution, grid = row.grid, hotspots = row.hotspots)
+    }
+
     /** Dedicated try-on endpoint (Fashn) — much better than generic image-edit for garment try-on. */
     suspend fun tryOnPiece(personUrl: String, garmentUrl: String, category: String = "auto"): GenerateResponse {
         val payload: JsonObject = buildJsonObject {
@@ -476,6 +604,164 @@ object Repo {
                 order("created_at", Order.ASCENDING)
             }.decodeList<ClosetItem>()
         }.getOrDefault(emptyList())
+    }
+
+    // ---- Sprint 3: Magazine Covers ----
+
+    /**
+     * Compose a magazine-cover render for an outfit photo. Delegates to the
+     * `compose-cover` edge function (Fal any-llm/vision for headline + pull-quote,
+     * Fal nano-banana/edit for the final 9:16 cover). Row is persisted server-side.
+     */
+    suspend fun composeCover(
+        sourceImageUrl: String,
+        outfitId: String? = null,
+        userName: String? = null,
+        seedHeadline: String? = null,
+        referenceCoverUrl: String? = null,
+        referenceTemplateId: String? = null,
+        masthead: String? = null,
+        mood: String? = null,
+        layout: String? = null,
+        customHeadline: String? = null,
+        customPullQuote: String? = null,
+        coverLines: List<String>? = null,
+        price: String? = null,
+        includeBarcode: Boolean? = null,
+        userPrompt: String? = null,
+        customMasthead: String? = null,
+    ): ComposeCoverResponse {
+        val payload: JsonObject = buildJsonObject {
+            put("source_image_url", sourceImageUrl)
+            if (outfitId != null) put("outfit_id", outfitId)
+            if (userName != null) put("user_name", userName)
+            if (seedHeadline != null) put("seed_headline", seedHeadline)
+            if (referenceCoverUrl != null) put("reference_cover_url", referenceCoverUrl)
+            if (referenceTemplateId != null) put("reference_template_id", referenceTemplateId)
+            if (masthead != null) put("masthead", masthead)
+            if (mood != null) put("mood", mood)
+            if (layout != null) put("layout", layout)
+            if (customHeadline != null) put("custom_headline", customHeadline)
+            if (customPullQuote != null) put("custom_pull_quote", customPullQuote)
+            if (coverLines != null) {
+                putJsonArray("cover_lines") { coverLines.forEach { add(it) } }
+            }
+            if (price != null) put("price", price)
+            if (includeBarcode != null) put("include_barcode", includeBarcode)
+            if (userPrompt != null) put("user_prompt", userPrompt)
+            if (customMasthead != null) put("custom_masthead", customMasthead)
+        }
+        val resp: HttpResponse = functions.invoke(function = "compose-cover", body = payload)
+        val text: String = resp.body()
+        val json = Json { ignoreUnknownKeys = true }
+        return runCatching { json.decodeFromString(ComposeCoverResponse.serializer(), text) }
+            .getOrElse { ComposeCoverResponse(error = text.take(200)) }
+    }
+
+    /**
+     * Create a style-only cover TEMPLATE (no subject photo). Delegates to the
+     * `create-cover-template` edge function — pure typography + color, no Fal.
+     * The saved template can later be fed to `composeCover` as a
+     * `referenceCoverUrl` to transfer style DNA onto a real photo.
+     */
+    suspend fun createCoverTemplate(
+        masthead: String? = null,
+        headline: String,
+        pullQuote: String? = null,
+        mood: String? = null,
+        color: String? = null,
+        layout: String? = null,
+        coverLines: List<String>? = null,
+        pose: String? = null,
+        price: String? = null,
+        includeBarcode: Boolean? = null,
+    ): ComposeCoverResponse {
+        val payload: JsonObject = buildJsonObject {
+            if (masthead != null) put("masthead", masthead)
+            put("headline", headline)
+            if (pullQuote != null) put("pull_quote", pullQuote)
+            if (mood != null) put("mood", mood)
+            if (color != null) put("color", color)
+            if (layout != null) put("layout", layout)
+            if (coverLines != null) {
+                putJsonArray("cover_lines") {
+                    coverLines.forEach { add(it) }
+                }
+            }
+            if (pose != null) put("pose", pose)
+            if (price != null) put("price", price)
+            if (includeBarcode != null) put("include_barcode", includeBarcode)
+        }
+        val resp: HttpResponse = functions.invoke(function = "create-cover-template", body = payload)
+        val text: String = resp.body()
+        val json = Json { ignoreUnknownKeys = true }
+        return runCatching { json.decodeFromString(ComposeCoverResponse.serializer(), text) }
+            .getOrElse { ComposeCoverResponse(error = text.take(200)) }
+    }
+
+    /** Regenerate the headline + pull-quote for an existing cover row (server updates it). */
+    suspend fun regenerateCoverHeadline(coverId: String): HeadlineResponse {
+        val payload: JsonObject = buildJsonObject { put("cover_id", coverId) }
+        return invokeHeadline(payload)
+    }
+
+    /** Regenerate a headline+quote for an ad-hoc outfit image (no persisted cover). */
+    suspend fun regenerateCoverHeadline(outfitId: String?, sourceImageUrl: String): HeadlineResponse {
+        val payload: JsonObject = buildJsonObject {
+            if (outfitId != null) put("outfit_id", outfitId)
+            put("source_image_url", sourceImageUrl)
+        }
+        return invokeHeadline(payload)
+    }
+
+    private suspend fun invokeHeadline(payload: JsonObject): HeadlineResponse {
+        val resp: HttpResponse = functions.invoke(function = "regenerate-cover-headline", body = payload)
+        val text: String = resp.body()
+        val json = Json { ignoreUnknownKeys = true }
+        return runCatching { json.decodeFromString(HeadlineResponse.serializer(), text) }
+            .getOrElse { HeadlineResponse(error = text.take(200)) }
+    }
+
+    /** Load the current user's magazine covers, most recent first. */
+    suspend fun loadCovers(limit: Long = 40): List<MagazineCover> {
+        val uid = userId ?: return emptyList()
+        return runCatching {
+            db["magazine_covers"].select {
+                filter { eq("user_id", uid) }
+                order("created_at", Order.DESCENDING)
+                limit(limit)
+            }.decodeList<MagazineCover>()
+        }.getOrDefault(emptyList())
+    }
+
+    /**
+     * Load the current user's cover TEMPLATES (rows with `outfit_id IS NULL`),
+     * most recent first. Templates are style-only covers created via
+     * `createCoverTemplate` — no subject photo attached.
+     */
+    suspend fun loadCoverTemplates(limit: Long = 40): List<MagazineCover> {
+        val uid = userId ?: return emptyList()
+        return runCatching {
+            db["magazine_covers"].select {
+                filter {
+                    eq("user_id", uid)
+                    isExact("outfit_id", null)
+                }
+                order("created_at", Order.DESCENDING)
+                limit(limit)
+            }.decodeList<MagazineCover>()
+        }.getOrDefault(emptyList())
+    }
+
+    /** Latest magazine cover for a specific outfit, or null if none. */
+    suspend fun loadCoverForOutfit(outfitId: String): MagazineCover? {
+        return runCatching {
+            db["magazine_covers"].select {
+                filter { eq("outfit_id", outfitId) }
+                order("created_at", Order.DESCENDING)
+                limit(1)
+            }.decodeSingleOrNull<MagazineCover>()
+        }.getOrNull()
     }
 
     suspend fun downloadBytes(url: String): ByteArray {
@@ -676,6 +962,109 @@ object Repo {
      * `outfits.linked_piece_id` column (added in the 2026-07 migration). Returns 0
      * on failure — the piece detail merely omits the "Worn N times" line.
      */
+    // ---- Sprint 5: Invitation decoder + outfit suggestions ----
+
+    /**
+     * Call `decode-invitation` with a signed image URL. Errors are flattened
+     * into [DecodeInvitationResponse.error] rather than thrown.
+     */
+    suspend fun decodeInvitation(imageUrl: String): DecodeInvitationResponse {
+        val payload: JsonObject = buildJsonObject { put("image_url", imageUrl) }
+        val resp: HttpResponse = functions.invoke(function = "decode-invitation", body = payload)
+        val text: String = resp.body()
+        val json = Json { ignoreUnknownKeys = true }
+        return runCatching { json.decodeFromString(DecodeInvitationResponse.serializer(), text) }
+            .getOrElse { DecodeInvitationResponse(error = text.take(200)) }
+    }
+
+    /**
+     * Ask `suggest-outfits` for 3 combos from the given closet inventory
+     * (trimmed to top 30) plus optional body profile + style tags.
+     */
+    suspend fun suggestOutfits(
+        dressCode: String,
+        eventType: String,
+        notes: String? = null,
+        closet: List<ClosetItem>,
+        bodyProfile: BodyProfile? = null,
+        styleTags: List<String>? = null,
+    ): SuggestOutfitsResponse {
+        val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
+        val payload: JsonObject = buildJsonObject {
+            put("dress_code", dressCode)
+            put("event_type", eventType)
+            if (notes != null) put("notes", notes)
+            if (bodyProfile != null) {
+                put("body_profile", json.encodeToJsonElement(BodyProfile.serializer(), bodyProfile))
+            }
+            if (styleTags != null) {
+                putJsonArray("style_tags") { styleTags.forEach { add(it) } }
+            }
+            putJsonArray("closet_items") {
+                closet.take(30).forEach { c ->
+                    val id = c.id ?: return@forEach
+                    addJsonObject {
+                        put("id", id)
+                        put("name", c.name ?: "")
+                        put("category", c.category ?: "")
+                        if (c.subcategory != null) put("subcategory", c.subcategory)
+                        if (c.image_url != null) put("image_url", c.image_url)
+                    }
+                }
+            }
+        }
+        val resp: HttpResponse = functions.invoke(function = "suggest-outfits", body = payload)
+        val text: String = resp.body()
+        return runCatching { json.decodeFromString(SuggestOutfitsResponse.serializer(), text) }
+            .getOrElse { SuggestOutfitsResponse(error = text.take(200)) }
+    }
+
+    /**
+     * Persist a decoded invitation + suggested combos to `invitation_reads`.
+     * RLS policy `own_invitation_reads` enforces ownership.
+     */
+    suspend fun saveInvitationRead(
+        imagePath: String?,
+        decoded: InvitationDecoded,
+        combos: List<OutfitCombo>,
+    ) {
+        val uid = userId ?: return
+        @Serializable
+        data class Row(
+            val user_id: String,
+            val image_path: String? = null,
+            val event_type: String? = null,
+            val dress_code: String? = null,
+            val time_of_day: String? = null,
+            val venue: String? = null,
+            val notes: String? = null,
+            val suggested_combos: List<OutfitCombo>? = null,
+        )
+        val row = Row(
+            user_id = uid,
+            image_path = imagePath,
+            event_type = decoded.event_type,
+            dress_code = decoded.dress_code,
+            time_of_day = decoded.time_of_day,
+            venue = decoded.venue,
+            notes = decoded.notes,
+            suggested_combos = combos,
+        )
+        db["invitation_reads"].insert(row)
+    }
+
+    /** Load invitation reads for the current user, newest first. */
+    suspend fun loadInvitationReads(): List<InvitationRead> {
+        val uid = userId ?: return emptyList()
+        return runCatching {
+            db["invitation_reads"].select {
+                filter { eq("user_id", uid) }
+                order("created_at", Order.DESCENDING)
+                limit(50)
+            }.decodeList<InvitationRead>()
+        }.getOrDefault(emptyList())
+    }
+
     suspend fun tryOnCountForPiece(pieceId: String): Int {
         val uid = userId ?: return 0
         return runCatching {

@@ -23,6 +23,10 @@ object CreditsGate {
      *   3) If pro && not intro, enforce [Supa.SUB_MONTHLY_CAP] per calendar month.
      */
     suspend fun check(cost: Int): GateResult {
+        // Server-granted Pro (Supabase profile.is_pro) bypasses balance and caps —
+        // ops-controlled unlock for testers/comps without a purchase.
+        if (RcBilling.hasServerPro()) return GateResult.Ok
+
         val balance = runCatching { Repo.credits() }.getOrDefault(0)
         if (balance < cost) return GateResult.InsufficientBalance(need = cost, have = balance)
 

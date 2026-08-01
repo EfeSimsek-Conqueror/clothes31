@@ -5,6 +5,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 val keystoreProperties = Properties().apply {
@@ -20,8 +22,8 @@ android {
         applicationId = "com.fitrater.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.0.2"
+        versionCode = 6
+        versionName = "1.0.4"
     }
 
     signingConfigs {
@@ -119,6 +121,11 @@ dependencies {
 
     // RevenueCat — Play Billing wrapper
     implementation("com.revenuecat.purchases:purchases:8.8.0")
+
+    // Firebase Crashlytics
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-crashlytics-ktx")
+    implementation("com.google.firebase:firebase-analytics-ktx")
 
     // In-app Play Store review flow (growth loop reward).
     implementation("com.google.android.play:review-ktx:2.0.2")

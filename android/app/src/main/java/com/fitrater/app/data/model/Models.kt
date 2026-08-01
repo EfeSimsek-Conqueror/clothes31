@@ -62,6 +62,63 @@ data class Annotation(
     val note: String = "",
 )
 
+/**
+ * Markup annotation from `score-outfit` v3. Type is "arrow" | "line" | "focus" | "swap".
+ * Coords normalized [0,1] (origin top-left):
+ *  - arrow/line: from + to
+ *  - focus:      at + radius
+ *  - swap:       at
+ */
+@Serializable
+data class MarkupAnnotation(
+    val type: String,
+    val coords: MarkupCoords,
+    val note: String = "",
+    val confidence: Double? = null,
+)
+
+@Serializable
+data class MarkupCoords(
+    val from: List<Double>? = null,
+    val to: List<Double>? = null,
+    val at: List<Double>? = null,
+    val radius: Double? = null,
+)
+
+/**
+ * Fit-tension heatmap from `score-outfit` v3. Grid rows × cols with values in [-1, 1]
+ * (-1 = pooling/loose, +1 = tight/pulling). Resolution is [cols, rows].
+ */
+@Serializable
+data class FitMap(
+    val resolution: List<Int>? = null,
+    val grid: List<List<Double>>? = null,
+    val hotspots: List<FitHotspot>? = null,
+)
+
+@Serializable
+data class FitHotspot(
+    val at: List<Double>,
+    val label: String,
+    val severity: Double,
+)
+
+/** Response from `transcribe-intent` — Fal wizper output. */
+@Serializable
+data class TranscribeResponse(
+    val transcript: String? = null,
+    val sanitized: String? = null,
+    val engine: String? = null,
+    val error: String? = null,
+)
+
+/** Local convenience payload — sanitized transcript + optional stored audio path. */
+@Serializable
+data class IntentPayload(
+    val text: String,
+    val audio_path: String? = null,
+)
+
 @Serializable
 data class Outfit(
     val id: String? = null,
@@ -241,6 +298,125 @@ data class HemNote(
     val id: String? = null,
     val user_id: String? = null,
     val body: String? = null,
+    val created_at: String? = null,
+)
+
+/**
+ * One-time body calibration output from the `analyze-body` edge function.
+ * All fields optional — the model may fail to classify one axis without
+ * invalidating the rest. Callers should treat `null` as "unknown".
+ */
+@Serializable
+data class BodyProfile(
+    val body_shape: String? = null,          // triangle | inverted_triangle | hourglass | rectangle | apple
+    val shoulder_hip_ratio: Double? = null,
+    val torso_leg_ratio: Double? = null,
+    val skin_undertone: String? = null,      // warm | cool | neutral
+    val coloring_season: String? = null,     // spring | summer | autumn | winter
+    val palette_hex: List<String>? = null,   // up to 6 hex codes, "#RRGGBB"
+    val notes: String? = null,
+)
+
+/** Envelope returned by `analyze-body`. `error` is populated on failure. */
+@Serializable
+data class BodyProfileResponse(
+    val profile: BodyProfile? = null,
+    val engine: String? = null,
+    val error: String? = null,
+)
+
+// --- Sprint 3: Magazine Cover ---
+
+/** Row in `public.magazine_covers`. All fields optional for tolerant decode. */
+@Serializable
+data class MagazineCover(
+    val id: String? = null,
+    val outfit_id: String? = null,
+    val user_id: String? = null,
+    val headline: String? = null,
+    val pull_quote: String? = null,
+    val vol_number: Int? = null,
+    val image_path: String? = null,
+    val created_at: String? = null,
+)
+
+/** Response from the `compose-cover` edge function. */
+@Serializable
+data class ComposeCoverResponse(
+    val cover_url: String? = null,
+    val headline: String? = null,
+    val pull_quote: String? = null,
+    val vol_number: Int? = null,
+    val cover_id: String? = null,
+    val error: String? = null,
+)
+
+/** Response from the `regenerate-cover-headline` edge function. */
+@Serializable
+data class HeadlineResponse(
+    val headline: String? = null,
+    val pull_quote: String? = null,
+    val error: String? = null,
+)
+
+// --- Sprint 5: Invitation decoder + outfit suggestions ---
+
+/**
+ * Structured event fields decoded from an invitation photo by the
+ * `decode-invitation` edge function. All fields optional — the model may
+ * fail to read one axis without invalidating the rest.
+ */
+@Serializable
+data class InvitationDecoded(
+    val event_type: String? = null,   // wedding|cocktail|dinner|gallery|work|casual|other
+    val dress_code: String? = null,   // black_tie|cocktail|smart_casual|casual|business|black_tie_optional|creative_black_tie|business_casual
+    val time_of_day: String? = null,  // morning|afternoon|evening|night
+    val venue: String? = null,
+    val date_text: String? = null,
+    val notes: String? = null,
+)
+
+/** Envelope returned by `decode-invitation`. `error` populated on failure. */
+@Serializable
+data class DecodeInvitationResponse(
+    val decoded: InvitationDecoded? = null,
+    val engine: String? = null,
+    val error: String? = null,
+)
+
+/**
+ * One outfit suggestion from `suggest-outfits`. `piece_ids` reference the
+ * closet items posted in the request. `gap` is non-null if the closet is
+ * missing a critical piece for the requested dress code.
+ */
+@Serializable
+data class OutfitCombo(
+    val score: Int? = null,
+    val piece_ids: List<String>? = null,
+    val rationale: String? = null,
+    val gap: String? = null,
+)
+
+/** Envelope returned by `suggest-outfits`. `error` populated on failure. */
+@Serializable
+data class SuggestOutfitsResponse(
+    val combos: List<OutfitCombo>? = null,
+    val engine: String? = null,
+    val error: String? = null,
+)
+
+/** Row in `public.invitation_reads`. All fields optional for tolerant decode. */
+@Serializable
+data class InvitationRead(
+    val id: String? = null,
+    val user_id: String? = null,
+    val image_path: String? = null,
+    val event_type: String? = null,
+    val dress_code: String? = null,
+    val time_of_day: String? = null,
+    val venue: String? = null,
+    val notes: String? = null,
+    val suggested_combos: List<OutfitCombo>? = null,
     val created_at: String? = null,
 )
 

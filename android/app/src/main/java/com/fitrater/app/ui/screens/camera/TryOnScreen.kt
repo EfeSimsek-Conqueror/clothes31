@@ -465,15 +465,10 @@ fun TryOnScreen(
                                     else -> pickedPieceUrl ?: pickedPiece?.image_path?.let { Repo.signedClosetUrl(it) }
                                         ?: error("No piece selected")
                                 }
-                                // Map our category → Fashn model's expected category token.
+                                // Pass the raw category through; the edge function decides
+                                // FASHN (garments) vs nano-banana (hats, glasses, shoes, etc.).
                                 val cat = if (pieceSource == "upload") null else pickedPiece?.category?.lowercase()
-                                val fashnCategory = when (cat) {
-                                    "top", "outerwear", "shirt", "hoodie", "blazer", "cardigan", "tank", "polo" -> "tops"
-                                    "bottom", "trousers", "jeans", "shorts", "skirt", "cargo", "sweats", "chinos" -> "bottoms"
-                                    "dress" -> "one-pieces"
-                                    else -> "auto"
-                                }
-                                val resp = Repo.tryOnPiece(personSigned, pieceSigned, fashnCategory)
+                                val resp = Repo.tryOnPiece(personSigned, pieceSigned, cat ?: "auto")
                                 val url = resp.image_url ?: error(resp.error ?: "Try-on failed")
                                 runCatching { Repo.spendCredits(Supa.TRYON_COST, "tryon") }
                                 resultUrl = url

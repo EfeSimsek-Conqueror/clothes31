@@ -146,6 +146,7 @@ fun FitraterApp() {
                             runCatching { Repo.grantSignupCreditsIfEmpty() }
                             com.fitrater.app.util.CreditsBus.refreshAsync()
                             val profile = runCatching { Repo.currentProfile() }.getOrNull()
+                            RcBilling.setServerPro(profile?.is_pro == true)
                             val target = if (profile?.onboarded == true) Route.Shell else Route.Onboard1
                             nav.navigate(target) {
                                 popUpTo(0) { inclusive = true }
@@ -170,6 +171,7 @@ fun FitraterApp() {
                         if (lastHandledUid != null) {
                             lastHandledUid = null
                             runCatching { RcBilling.signOut() }
+                            RcBilling.setServerPro(false)
                             com.fitrater.app.util.CreditsBus.clear()
                             nav.navigate(Route.SignIn) {
                                 popUpTo(0) { inclusive = true }

@@ -40,14 +40,31 @@ object RcBilling {
     private val _customerInfo = MutableStateFlow<CustomerInfo?>(null)
     val customerInfo: StateFlow<CustomerInfo?> = _customerInfo.asStateFlow()
 
+    /** Server-granted Pro flag from Supabase profile.is_pro. Lets ops grant Pro without a purchase. */
+    private val _serverPro = MutableStateFlow(false)
+
     private val _isPro = MutableStateFlow(false)
     /** Reactive Pro state. Compose can `collectAsState` this and pass it into feature-gate params. */
     val isPro: StateFlow<Boolean> = _isPro.asStateFlow()
 
+    private fun recompute() {
+        val rc = _customerInfo.value?.entitlements?.get(ENTITLEMENT_PRO)?.isActive == true
+        _isPro.value = rc || _serverPro.value
+    }
+
     private fun publish(info: CustomerInfo?) {
         _customerInfo.value = info
-        _isPro.value = info?.entitlements?.get(ENTITLEMENT_PRO)?.isActive == true
+        recompute()
     }
+
+    /** Called after Supabase profile loads. `true` unlocks all Pro gates. */
+    fun setServerPro(value: Boolean) {
+        _serverPro.value = value
+        recompute()
+    }
+
+    /** True if Pro was granted server-side (Supabase profile.is_pro). */
+    fun hasServerPro(): Boolean = _serverPro.value
 
     fun init(context: Context, apiKey: String) {
         if (configured) return
@@ -110,7 +127,7 @@ object RcBilling {
     }
 
     fun isPro(info: CustomerInfo? = _customerInfo.value): Boolean =
-        info?.entitlements?.get(ENTITLEMENT_PRO)?.isActive == true
+        _serverPro.value || info?.entitlements?.get(ENTITLEMENT_PRO)?.isActive == true
 
     /** True if the user is inside the 7-day intro (free trial) window of the annual sub. */
     suspend fun isInTrial(): Boolean {

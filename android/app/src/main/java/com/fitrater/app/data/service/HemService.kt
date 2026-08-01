@@ -3,6 +3,8 @@ package com.fitrater.app.data.service
 import android.util.Log
 import com.fitrater.app.data.Supa
 import com.fitrater.app.data.model.Annotation
+import com.fitrater.app.data.model.FitMap
+import com.fitrater.app.data.model.MarkupAnnotation
 import com.fitrater.app.data.model.ScorePiece
 import com.fitrater.app.data.model.ScoreResult
 import com.fitrater.app.data.model.Subscores
@@ -25,6 +27,10 @@ data class ScoreOutfitResponse(
     val hem_comment: String? = null,
     val swaps: List<String>? = null,
     val annotations: List<Annotation>? = null,
+    // Sprint 2 additions — all optional so v2 responses still decode.
+    val markup_annotations: List<MarkupAnnotation>? = null,
+    val fit_map: FitMap? = null,
+    val fits_you: Double? = null,
     val raw_model_response: String? = null,
     val error: String? = null,
     val raw: String? = null,
@@ -37,6 +43,10 @@ data class HemScored(
     val subscores: Subscores,
     val swaps: List<String>,
     val annotations: List<Annotation>,
+    // Sprint 2 additions — safe defaults so existing callers ignore them.
+    val markupAnnotations: List<MarkupAnnotation> = emptyList(),
+    val fitMap: FitMap? = null,
+    val fitsYou: Double? = null,
 )
 
 /**
@@ -80,6 +90,9 @@ object HemService {
             subscores = subs,
             swaps = swaps,
             annotations = annotations,
+            markupAnnotations = parsed.markup_annotations.orEmpty(),
+            fitMap = parsed.fit_map,
+            fitsYou = parsed.fits_you,
         )
     }
 

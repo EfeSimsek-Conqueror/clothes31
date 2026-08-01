@@ -7,17 +7,51 @@
     <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
     <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
+    <key>CFBundleDisplayName</key><string>Fitrater</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>1.0</string>
-    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleVersion</key><string>4</string>
     <key>LSRequiresIPhoneOS</key><true/>
     <key>UILaunchScreen</key><dict/>
-    <key>UIRequiredDeviceCapabilities</key><array><string>armv7</string></array>
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>
     </array>
-    <key>NSCameraUsageDescription</key><string>FitScore uses your camera to score outfits.</string>
-    <key>NSPhotoLibraryUsageDescription</key><string>FitScore imports photos so you can score existing looks.</string>
+    <!-- Camera + Photo library — required copy for camera flows (Score, TryOn, Roast, Decode). -->
+    <key>NSCameraUsageDescription</key>
+    <string>Fitrater uses your camera to score outfits and try on generated pieces.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Fitrater imports photos so you can score existing looks.</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>Fitrater saves generated pieces and rated looks to your library.</string>
+    <!-- OAuth callback + Google Sign-In URL types. The `com.cloudgeng.mealmind` scheme
+         is the Supabase magic-link / OIDC callback; the reversed Google client
+         id is required by GoogleSignIn to receive its own callback. -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key><string>Editor</string>
+            <key>CFBundleURLName</key><string>com.fitrater.app.auth</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>com.fitrater.app</string>
+            </array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeRole</key><string>Editor</string>
+            <key>CFBundleURLName</key><string>com.fitrater.app.google</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>com.googleusercontent.apps.1062757466057-2mqmapg0ebuhc1mc4iruso4v47619lke</string>
+            </array>
+        </dict>
+    </array>
+    <!-- GoogleSignIn config — server (web) client id is what Supabase verifies against. -->
+    <key>GIDClientID</key>
+    <string>1062757466057-2mqmapg0ebuhc1mc4iruso4v47619lke.apps.googleusercontent.com</string>
+    <key>GIDServerClientID</key>
+    <string>1062757466057-vngm8cbvrdjrra81sunt5ebi2rsf5u82.apps.googleusercontent.com</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
 </dict>
 </plist>

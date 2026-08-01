@@ -690,6 +690,10 @@ fun StudioCreateScreen(
             val successful = results.filterNotNull()
             val failed = results.count { it == null }
             variations = successful.map { VariationResult(url = it, savedOk = false) }
+            // Persist each successful alternative to Journal so they survive past this session.
+            for (url in successful) {
+                autoSaveToJournal(url, "variation-auto")
+            }
             if (failed > 0) {
                 com.fitrater.app.util.ToastBus.post(
                     "$failed variation${if (failed > 1) "s" else ""} failed — kept ${GEN_COST * failed} credits",
