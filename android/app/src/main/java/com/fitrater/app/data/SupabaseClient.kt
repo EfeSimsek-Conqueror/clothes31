@@ -32,16 +32,24 @@ object Supa {
     // RevenueCat public Android SDK key. Get from RevenueCat dashboard →
     // Project Settings → API Keys → "Public app-specific API keys" for the Android app.
     // Format is `goog_...`. Replace before shipping the production AAB.
-    const val RC_ANDROID_API_KEY: String = "goog_tRCMTCDVJbHcQYWqvbfQBxgvaKi"
+    const val RC_ANDROID_API_KEY: String = "goog_VwYVDpdRiqfJJKGOSLRwNuuwecv"
 
     // Credit economics — must match RevenueCat product credit grants.
-    const val SIGNUP_CREDITS: Int = 100
+    const val SIGNUP_CREDITS: Int = 25
     const val SCORE_COST: Int = 5
     const val GENERATE_COST: Int = 15
     const val TRYON_COST: Int = 20
     const val VERSUS_COST: Int = 8
     const val ROAST_COST: Int = 5
     const val DECODE_COST: Int = 10
+    const val OCCASION_COST: Int = 15
+    const val BODY_CALIBRATION_COST: Int = 0        // one-time, foundational
+    const val MAGAZINE_COVER_COST: Int = 10         // nano-banana render + headline
+    const val MIRROR_CLEANER_COST: Int = 0          // bundled as loyalty perk
+    const val INVITATION_DECODE_COST: Int = 6       // OCR + combo generation
+    const val COVER_TEMPLATE_COST: Int = 2          // Fal flux/schnell placeholder + SVG chrome
+    const val TAILOR_TICKET_COST: Int = 2           // text-only prompt after heatmap
+    const val FRONT_BACK_EXTRA_COST: Int = 2        // added on top of SCORE_COST for dual shot
 
     // Trial abuse guard: annual sub in its 7-day INTRO period is capped to this many credits/day.
     const val TRIAL_DAILY_CAP: Int = 20
@@ -50,15 +58,16 @@ object Supa {
 
     // SKU id -> credits granted mapping (client-side, source of truth).
     val CREDIT_PACK_GRANTS: Map<String, Int> = mapOf(
-        "credits_100" to 100,       // Starter — $2.99
-        "credits_500" to 400,       // Popular — $9.99 (SKU id keeps historical name; grant is 400)
-        "credits_1500" to 1200,     // Pro — $29.99
+        "credits_100" to 150,       // Starter — $1.99 → 150cr
+        "credits_500" to 500,       // Popular — $6.99 → 500cr
+        "credits_1500" to 1200,     // Pro Pack — $14.99 → 1200cr
+        "credits_5000" to 3000,     // Mega — $39.99 → 3000cr (add to Play Console before enabling)
     )
 
     // Sub monthly credit cap (fair-use).
-    const val SUB_MONTHLY_CAP: Int = 400
-    // Annual sub gives 3000/yr total (~250/mo) — enforced via monthly reset.
-    const val SUB_ANNUAL_MONTHLY_CAP: Int = 250
+    const val SUB_MONTHLY_CAP: Int = 1200
+    // Annual sub gives 9000/yr total (~750/mo) — enforced via monthly reset.
+    const val SUB_ANNUAL_MONTHLY_CAP: Int = 750
 
     val client: SupabaseClient by lazy {
         createSupabaseClient(supabaseUrl = URL, supabaseKey = ANON_KEY) {

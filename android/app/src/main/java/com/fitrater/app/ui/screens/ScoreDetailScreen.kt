@@ -179,13 +179,24 @@ fun ScoreDetailScreen(outfitId: String, onScoreALook: () -> Unit, onClose: () ->
                         PhotoTile(modifier = Modifier.fillMaxSize(), tint = Color(0xFF7A6A55))
                     }
 
-                    // Annotations overlay
+                    // v1 subscore annotations overlay
                     val annotations = o?.annotations
                     if (!annotations.isNullOrEmpty()) {
                         AnnotationsOverlay(
                             annotations = annotations,
                             modifier = Modifier.fillMaxSize(),
                         )
+                    }
+                    // v3 markup annotations overlay (arrows/lines/focus/swap)
+                    val outfitIdVal = outfitId
+                    var markups by remember(outfitIdVal) {
+                        mutableStateOf<List<com.fitrater.app.data.model.MarkupAnnotation>>(emptyList())
+                    }
+                    LaunchedEffect(outfitIdVal) {
+                        markups = runCatching { com.fitrater.app.data.repo.Repo.loadAnnotations(outfitIdVal) }.getOrDefault(emptyList())
+                    }
+                    if (markups.isNotEmpty()) {
+                        MarkupOverlay(annotations = markups, modifier = Modifier.fillMaxSize())
                     }
 
                     // Close X top-left
@@ -440,6 +451,89 @@ private fun AnnotationsOverlay(
                 yPx = p.labelY,
                 onDismiss = { openedIndex = null },
             )
+        }
+    }
+}
+
+@Composable
+private fun MarkupOverlay(
+    annotations: List<com.fitrater.app.data.model.MarkupAnnotation>,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.foundation.Canvas(modifier = modifier) {
+        val w = size.width; val h = size.height
+        val stroke = HemColors.Bronze
+        annotations.forEach { a ->
+            val coords = a.coords ?: return@forEach
+            when (a.type) {
+                "arrow" -> {
+                    val f = coords.from; val t = coords.to
+                    if (f != null && f.size == 2 && t != null && t.size == 2) {
+                        val p1 = androidx.compose.ui.geometry.Offset(w * f[0].toFloat(), h * f[1].toFloat())
+                        val p2 = androidx.compose.ui.geometry.Offset(w * t[0].toFloat(), h * t[1].toFloat())
+                        drawLine(color = stroke, start = p1, end = p2, strokeWidth = 1.4f * density)
+                        val angle = kotlin.math.atan2((p2.y - p1.y).toDouble(), (p2.x - p1.x).toDouble())
+                        val head = 10f * density
+                        val leftAngle = angle - Math.PI / 6
+                        val rightAngle = angle + Math.PI / 6
+                        drawLine(
+                            color = stroke,
+                            start = p2,
+                            end = androidx.compose.ui.geometry.Offset(
+                                (p2.x - kotlin.math.cos(leftAngle) * head).toFloat(),
+                                (p2.y - kotlin.math.sin(leftAngle) * head).toFloat(),
+                            ),
+                            strokeWidth = 1.4f * density,
+                        )
+                        drawLine(
+                            color = stroke,
+                            start = p2,
+                            end = androidx.compose.ui.geometry.Offset(
+                                (p2.x - kotlin.math.cos(rightAngle) * head).toFloat(),
+                                (p2.y - kotlin.math.sin(rightAngle) * head).toFloat(),
+                            ),
+                            strokeWidth = 1.4f * density,
+                        )
+                    }
+                }
+                "line" -> {
+                    val f = coords.from; val t = coords.to
+                    if (f != null && f.size == 2 && t != null && t.size == 2) {
+                        val p1 = androidx.compose.ui.geometry.Offset(w * f[0].toFloat(), h * f[1].toFloat())
+                        val p2 = androidx.compose.ui.geometry.Offset(w * t[0].toFloat(), h * t[1].toFloat())
+                        drawLine(
+                            color = stroke, start = p1, end = p2,
+                            strokeWidth = 1.2f * density,
+                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4f * density, 4f * density)),
+                        )
+                    }
+                }
+                "focus" -> {
+                    val at = coords.at
+                    if (at != null && at.size == 2) {
+                        val cx = w * at[0].toFloat(); val cy = h * at[1].toFloat()
+                        val r = w * (coords.radius?.toFloat() ?: 0.08f)
+                        drawCircle(
+                            color = stroke,
+                            radius = r,
+                            center = androidx.compose.ui.geometry.Offset(cx, cy),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.4f * density),
+                        )
+                    }
+                }
+                "swap" -> {
+                    val at = coords.at
+                    if (at != null && at.size == 2) {
+                        val cx = w * at[0].toFloat(); val cy = h * at[1].toFloat()
+                        val s = 7f * density
+                        val path = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(cx, cy - s); lineTo(cx + s, cy)
+                            lineTo(cx, cy + s); lineTo(cx - s, cy); close()
+                        }
+                        drawPath(path = path, color = stroke)
+                    }
+                }
+            }
         }
     }
 }

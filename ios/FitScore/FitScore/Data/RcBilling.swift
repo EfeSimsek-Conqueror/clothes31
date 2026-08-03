@@ -133,10 +133,10 @@ final class RcBilling: ObservableObject {
     /// and skip the insert if a row with the same reference already exists.
     /// Mirrors Android `grantCreditsForSku`.
     func grantCreditsIfNeeded(productId: String, transactionId: String) async {
-        // Match the SKU against our client-side grant table. Product ids may
-        // carry country / period suffixes on the App Store, so accept any
-        // productId that CONTAINS one of the known keys.
-        let credits: Int? = Supa.creditPackGrants.first(where: { productId.contains($0.key) })?.value
+        // Match the SKU against our client-side grant table by exact id.
+        // (contains-match is unsafe — `_credits_500` is a substring of
+        // `_credits_5000`, which would grant the wrong amount.)
+        let credits: Int? = Supa.creditPackGrants[productId]
         guard let credits, credits > 0 else { return }
         guard let uid = Repo.shared.userId else { return }
         // Idempotency: check for an existing row with this reference_id.

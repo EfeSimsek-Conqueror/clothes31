@@ -217,6 +217,7 @@ fun FitraterApp() {
                                 onOpenScoreSheet = { showCameraMenu = true },
                                 onOpenDetail = { id -> nav.navigate(Route.scoreDetail(id)) },
                                 onOpenCreateStudio = { nav.navigate(Route.StudioCreate) },
+                                onOpenCoverTemplate = { nav.navigate(Route.CoverTemplate) },
                                 onOpenYou = { showYouSheet = true },
                                 onOpenCamera = { nav.navigate(Route.Camera) },
                                 onOpenCredits = { showCreditsSheet = true },
@@ -292,6 +293,69 @@ fun FitraterApp() {
                                 onClose = { nav.popBackStack() },
                                 onOpenPaywall = { nav.navigate(Route.Paywall) },
                                 onOpenCamera = { nav.navigate(Route.Camera) },
+                            )
+                        }
+                        composable(Route.StyleDna) {
+                            com.fitrater.app.ui.screens.subpages.StyleDnaScreen(
+                                monthKey = null,
+                                onClose = { nav.popBackStack() },
+                            )
+                        }
+                        composable(Route.OccasionCoach) {
+                            com.fitrater.app.ui.screens.camera.OccasionCoachScreen(
+                                onClose = { nav.popBackStack() },
+                                onOpenPaywall = { nav.navigate(Route.Paywall) },
+                            )
+                        }
+                        composable(Route.InvitationDecoder) {
+                            com.fitrater.app.ui.screens.camera.InvitationDecoderScreen(
+                                onClose = { nav.popBackStack() },
+                                onOpenPaywall = { nav.navigate(Route.Paywall) },
+                            )
+                        }
+                        composable(Route.BodyCalibration) {
+                            com.fitrater.app.ui.screens.onboarding.BodyCalibrationScreen(
+                                onFinished = { profile ->
+                                    if (profile != null) nav.navigate(Route.BodyProfileReveal) {
+                                        popUpTo(Route.BodyCalibration) { inclusive = true }
+                                    } else nav.popBackStack()
+                                },
+                            )
+                        }
+                        composable(Route.BodyProfileReveal) {
+                            var profile by remember { mutableStateOf<com.fitrater.app.data.model.BodyProfile?>(null) }
+                            LaunchedEffect(Unit) {
+                                profile = runCatching { com.fitrater.app.data.repo.Repo.loadBodyProfile() }.getOrNull()
+                            }
+                            val p = profile
+                            if (p != null) {
+                                com.fitrater.app.ui.screens.onboarding.BodyProfileRevealScreen(
+                                    profile = p,
+                                    onDone = { nav.popBackStack() },
+                                    onRecalibrate = {
+                                        nav.navigate(Route.BodyCalibration) {
+                                            popUpTo(Route.BodyProfileReveal) { inclusive = true }
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                        composable(Route.CoverTemplate) {
+                            com.fitrater.app.ui.screens.studio.CoverTemplateCreatorScreen(
+                                onClose = { nav.popBackStack() },
+                            )
+                        }
+                        composable(
+                            Route.ComposeCover,
+                            arguments = listOf(navArgument("outfitId") {
+                                type = NavType.StringType; nullable = true; defaultValue = null
+                            }),
+                        ) { entry ->
+                            val outfitId = entry.arguments?.getString("outfitId")?.ifBlank { null }
+                            com.fitrater.app.ui.screens.camera.MagazineCoverSheetContent(
+                                outfitId = outfitId,
+                                onOpenCamera = { nav.navigate(Route.Camera) },
+                                onClose = { nav.popBackStack() },
                             )
                         }
                         composable(Route.Roast) {
@@ -474,6 +538,10 @@ fun FitraterApp() {
                             showCameraMenu = false
                             nav.navigate(Route.Decode)
                         },
+                        onPickComposeCover = {
+                            showCameraMenu = false
+                            nav.navigate(Route.composeCover(null))
+                        },
                         onOpenPaywall = {
                             showCameraMenu = false
                             openPaywall("tryon")
@@ -502,6 +570,7 @@ private fun AppShell(
     onOpenScoreSheet: () -> Unit,
     onOpenDetail: (String) -> Unit,
     onOpenCreateStudio: () -> Unit,
+    onOpenCoverTemplate: () -> Unit,
     onOpenYou: () -> Unit,
     onOpenCamera: () -> Unit,
     onOpenCredits: () -> Unit,
@@ -574,6 +643,7 @@ private fun AppShell(
                             com.fitrater.app.util.EditRequestBus.set(item, url)
                             onOpenCreateStudio()
                         },
+                        onCreateCoverTemplate = onOpenCoverTemplate,
                     )
                     PAGE_JOURNAL -> JournalScreen(onOpenDetail = onOpenDetail)
                 }

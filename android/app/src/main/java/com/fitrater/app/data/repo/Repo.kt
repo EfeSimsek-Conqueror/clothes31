@@ -475,6 +475,40 @@ object Repo {
             .getOrElse { BodyProfileResponse(error = text.take(200)) }
     }
 
+    /** Persist the body profile (upsert-by-user) so ratings can personalize. */
+    suspend fun saveBodyProfile(profile: BodyProfile, frontPath: String?, sidePath: String?) {
+        val uid = userId ?: return
+        val row = buildJsonObject {
+            put("user_id", uid)
+            profile.body_shape?.let { put("body_shape", it) }
+            profile.shoulder_hip_ratio?.let { put("shoulder_hip_ratio", it) }
+            profile.torso_leg_ratio?.let { put("torso_leg_ratio", it) }
+            profile.skin_undertone?.let { put("skin_undertone", it) }
+            profile.coloring_season?.let { put("coloring_season", it) }
+            profile.palette_hex?.let { p ->
+                putJsonArray("palette_hex") { p.forEach { add(it) } }
+            }
+            profile.notes?.let { put("notes", it) }
+            frontPath?.let { put("front_path", it) }
+            sidePath?.let { put("side_path", it) }
+        }
+        runCatching {
+            db["body_profiles"].upsert(row) { onConflict = "user_id" }
+        }
+    }
+
+    /** Load the persisted body profile (most recent row for user). */
+    suspend fun loadBodyProfile(): BodyProfile? {
+        val uid = userId ?: return null
+        return runCatching {
+            db["body_profiles"].select {
+                filter { eq("user_id", uid) }
+                order("created_at", Order.DESCENDING)
+                limit(1)
+            }.decodeSingleOrNull<BodyProfile>()
+        }.getOrNull()
+    }
+
     // ---- Sprint 2: transcribe-intent + annotation/fit-map persistence ----
 
     /**
@@ -741,16 +775,18 @@ object Repo {
      */
     suspend fun loadCoverTemplates(limit: Long = 40): List<MagazineCover> {
         val uid = userId ?: return emptyList()
+        // Load all this user's covers, then keep only rows with outfit_id NULL
+        // client-side. The postgrest-kt `IS null` filter had brittle typing on
+        // this project so a client filter is the safe path.
         return runCatching {
             db["magazine_covers"].select {
-                filter {
-                    eq("user_id", uid)
-                    isExact("outfit_id", null)
-                }
+                filter { eq("user_id", uid) }
                 order("created_at", Order.DESCENDING)
-                limit(limit)
+                limit(limit * 2)
             }.decodeList<MagazineCover>()
         }.getOrDefault(emptyList())
+            .filter { it.outfit_id.isNullOrBlank() }
+            .take(limit.toInt())
     }
 
     /** Latest magazine cover for a specific outfit, or null if none. */

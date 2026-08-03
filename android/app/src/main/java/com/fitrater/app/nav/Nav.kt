@@ -27,4 +27,14 @@ object Route {
     const val Versus = "versus"
     const val Roast = "roast"
     const val Decode = "decode"
+    // Sprint-era additions (parity with iOS)
+    const val CoverTemplate = "cover_template"
+    const val ComposeCover = "compose_cover?outfitId={outfitId}"
+    fun composeCover(outfitId: String? = null): String =
+        if (outfitId.isNullOrBlank()) "compose_cover?outfitId=" else "compose_cover?outfitId=$outfitId"
+    const val BodyCalibration = "body_calibration"
+    const val BodyProfileReveal = "body_reveal"
+    const val InvitationDecoder = "invitation_decoder"
+    const val OccasionCoach = "occasion_coach"
+    const val StyleDna = "style_dna"
 }

@@ -27,11 +27,11 @@ enum Supa {
 
     /// RevenueCat iOS public API key (safe to bundle). Get from
     /// RevenueCat dashboard → Fitrater iOS app → App configuration.
-    static let revenueCatIOSKey = "appl_CzEAtrNVYSafdHDIXAFTUOgIgAU"
+    static let revenueCatIOSKey = "appl_XcRnJzmGqEityyPyHuMWRdaSWvV"
 
     // MARK: - Credit economics (must match Android + RevenueCat grants)
 
-    static let signupCredits = 100
+    static let signupCredits = 25
     static let scoreCost = 5
     static let generateCost = 15
     static let tryonCost = 20
@@ -55,16 +55,17 @@ enum Supa {
     /// Play/App Store rating one-shot reward.
     static let playRatingReward = 20
     /// Standard monthly sub credit cap (fair-use).
-    static let subMonthlyCap = 400
+    static let subMonthlyCap = 1200
     /// Annual sub gives 3000/yr total (~250/mo) — enforced via monthly reset.
-    static let subAnnualMonthlyCap = 250
+    static let subAnnualMonthlyCap = 750
 
     /// SKU id → credits granted mapping (client-side source of truth). Keys
     /// mirror App Store product ids configured in RevenueCat.
     static let creditPackGrants: [String: Int] = [
-        "fitrater_pro_credits_100": 100,   // Starter — $2.99
-        "fitrater_pro_credits_500": 400,   // Popular — $9.99 (SKU name is _500 but grant is 400)
-        "fitrater_pro_credits_1500": 1200  // Pro Pack — $29.99
+        "fitrater_v2_credits_100": 150,     // Starter — $1.99 → 150cr
+        "fitrater_v2_credits_500": 500,     // Popular — $6.99 → 500cr
+        "fitrater_v2_credits_1500": 1200,   // Pro Pack — $14.99 → 1200cr
+        "fitrater_v2_credits_5000": 3000    // Mega — $39.99 → 3000cr
     ]
 
     // MARK: - Client

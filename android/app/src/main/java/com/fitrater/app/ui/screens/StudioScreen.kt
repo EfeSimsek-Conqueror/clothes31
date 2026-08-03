@@ -53,6 +53,7 @@ import com.fitrater.app.ui.theme.HemColors
 import com.fitrater.app.ui.theme.HemSpace
 import com.fitrater.app.ui.theme.HemType
 import com.fitrater.app.ui.theme.SerifDisplay
+import com.fitrater.app.data.Supa
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,6 +62,7 @@ import kotlinx.coroutines.withContext
 fun StudioScreen(
     onCreateNew: () -> Unit,
     onOpenEdit: (item: ClosetItem, referenceUrl: String?) -> Unit = { _, _ -> },
+    onCreateCoverTemplate: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -242,6 +244,13 @@ fun StudioScreen(
                     },
                 )
             }
+            Spacer(Modifier.height(HemSpace.sm))
+            StudioActionCard(
+                title = "✦ Design a cover",
+                subtitle = "Save a magazine template · ${Supa.COVER_TEMPLATE_COST} credits",
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onCreateCoverTemplate,
+            )
         }
         Spacer(Modifier.height(HemSpace.xl))
     }

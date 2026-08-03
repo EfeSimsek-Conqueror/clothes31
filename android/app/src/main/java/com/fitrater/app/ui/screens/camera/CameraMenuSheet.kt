@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,6 +64,7 @@ fun CameraMenuSheet(
     onPickVersus: () -> Unit,
     onPickRoast: () -> Unit,
     onPickDecode: () -> Unit,
+    onPickComposeCover: () -> Unit = {},
     onOpenPaywall: () -> Unit = {},
     isPro: Boolean = false,
 ) {
@@ -160,6 +162,19 @@ fun CameraMenuSheet(
             open = openId == "decode",
             onTap = { toggle("decode") },
             onGo = { onPickDecode() },
+        )
+        MenuHairline()
+        AccordionRow(
+            id = "cover",
+            icon = Icons.Filled.PhotoLibrary,
+            title = "Compose a cover",
+            subtitle = "Face-swap onto a magazine cover.",
+            cost = "${Supa.MAGAZINE_COVER_COST} credits",
+            description = "One photo of you + optional reference cover. Hem crops, swaps, and sets the type.",
+            needs = "1 photo of yourself (+ optional cover to mimic).",
+            open = openId == "cover",
+            onTap = { toggle("cover") },
+            onGo = { onPickComposeCover() },
         )
         MenuHairline()
         Spacer(Modifier.height(HemSpace.xl))

@@ -535,10 +535,10 @@ private fun SheetChevronRow(title: String, onClick: () -> Unit) {
 private data class CreditPackSpec(val productId: String, val name: String, val credits: Int, val popular: Boolean = false)
 
 private val CREDIT_PACK_SPECS = listOf(
-    CreditPackSpec("credits_100", "Starter", 100),
+    CreditPackSpec("credits_100", "Starter", 150),
     CreditPackSpec("credits_500", "Popular", 500, popular = true),
-    CreditPackSpec("credits_1500", "Pro Pack", 1500),
-    CreditPackSpec("credits_5000", "Mega", 5000),
+    CreditPackSpec("credits_1500", "Pro Pack", 1200),
+    CreditPackSpec("credits_5000", "Mega", 3000),
 )
 
 /** Presentation model for a single row in the credits sheet. */
@@ -580,7 +580,10 @@ fun CreditsSheetContent(onClose: () -> Unit, paywallContext: String? = null) {
         if (offering != null) {
             // Build pack rows: match RC packages by product.id → CreditPackSpec.
             packs = CREDIT_PACK_SPECS.map { spec ->
-                val pkg = offering.availablePackages.firstOrNull { it.product.id.contains(spec.productId) }
+                // Exact-match on product id. Substring match is unsafe here —
+                // "credits_500" is a prefix of "credits_5000", which would let
+                // Popular pick up Mega's price/product.
+                val pkg = offering.availablePackages.firstOrNull { it.product.id == spec.productId }
                 PackRow(
                     spec = spec,
                     pkg = pkg,
@@ -589,8 +592,8 @@ fun CreditsSheetContent(onClose: () -> Unit, paywallContext: String? = null) {
             }
             plans = listOf(
                 PlanRow("weekly", "Weekly", "cancel anytime", offering.weekly, offering.weekly?.product?.price?.formatted ?: "—"),
-                PlanRow("monthly", "Monthly", "most popular", offering.monthly, offering.monthly?.product?.price?.formatted ?: "—"),
-                PlanRow("annual", "Annual", "7-day free trial", offering.annual, offering.annual?.product?.price?.formatted ?: "—"),
+                PlanRow("monthly", "Monthly", "1,200 credits / month", offering.monthly, offering.monthly?.product?.price?.formatted ?: "—"),
+                PlanRow("annual", "Annual", "750 credits / mo · 7-day trial", offering.annual, offering.annual?.product?.price?.formatted ?: "—"),
             )
         }
         loadingOffering = false
@@ -789,8 +792,8 @@ private fun defaultPackRows(): List<PackRow> =
 
 private fun defaultPlanRows(): List<PlanRow> = listOf(
     PlanRow("weekly", "Weekly", "cancel anytime", pkg = null, priceLabel = "—"),
-    PlanRow("monthly", "Monthly", "most popular", pkg = null, priceLabel = "—"),
-    PlanRow("annual", "Annual", "7-day free trial", pkg = null, priceLabel = "—"),
+    PlanRow("monthly", "Monthly", "1,200 credits / month", pkg = null, priceLabel = "—"),
+    PlanRow("annual", "Annual", "750 credits / mo · 7-day trial", pkg = null, priceLabel = "—"),
 )
 
 private fun android.content.Context.findActivity(): android.app.Activity? {

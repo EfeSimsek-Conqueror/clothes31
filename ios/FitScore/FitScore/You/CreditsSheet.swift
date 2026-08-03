@@ -31,9 +31,10 @@ struct CreditsSheet: View {
     private var balance: Int { creditsBus.balance ?? 0 }
 
     private static let packSpecs: [(id: String, name: String, credits: Int, popular: Bool)] = [
-        ("fitrater_pro_credits_100", "Starter", 100, false),
-        ("fitrater_pro_credits_500", "Popular", 400, true),
-        ("fitrater_pro_credits_1500", "Pro Pack", 1200, false),
+        ("fitrater_v2_credits_100", "Starter", 150, false),
+        ("fitrater_v2_credits_500", "Popular", 500, true),
+        ("fitrater_v2_credits_1500", "Pro Pack", 1200, false),
+        ("fitrater_v2_credits_5000", "Mega", 3000, false),
     ]
 
     private let termsURL = URL(string: "https://fitrater.ai/terms")!
@@ -53,14 +54,6 @@ struct CreditsSheet: View {
                 }
                 restoreLink
                 legalLinks
-                if !debugMsg.isEmpty {
-                    Text(debugMsg)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(Palette.muted)
-                        .padding(8)
-                        .background(Palette.card)
-                        .cornerRadius(6)
-                }
                 Spacer().frame(height: 24)
             }
             .padding(20)
@@ -163,12 +156,12 @@ struct CreditsSheet: View {
             Text("Get monthly refill credits + Pro perks.")
                 .font(Serif.body(14)).foregroundStyle(Palette.muted)
             HStack(spacing: 8) {
-                PlanTile(label: "Monthly", subline: "most popular", price: monthlyPrice, popular: true,
+                PlanTile(label: "Monthly", subline: "1,200 credits / month", price: monthlyPrice, popular: true,
                          busy: processing == "monthly", enabled: processing == nil && monthlyPackage != nil, comingSoon: false) {
                     if let pkg = monthlyPackage { Task { await purchase(pkg, grantId: "monthly", credits: 0) } }
                     else { Task { await retryOffering(); toasts.post("Store still syncing — try again in a minute.") } }
                 }
-                PlanTile(label: "Annual", subline: "7-day free trial", price: annualPrice, popular: false,
+                PlanTile(label: "Annual", subline: "750 credits / mo · 7-day trial", price: annualPrice, popular: false,
                          busy: processing == "annual", enabled: processing == nil && annualPackage != nil, comingSoon: false) {
                     if let pkg = annualPackage { Task { await purchase(pkg, grantId: "annual", credits: 0) } }
                     else { Task { await retryOffering(); toasts.post("Store still syncing — try again in a minute.") } }
@@ -220,7 +213,7 @@ struct CreditsSheet: View {
         guard let offering else { return [:] }
         var m: [String: Package] = [:]
         for p in offering.availablePackages {
-            for spec in Self.packSpecs where p.storeProduct.productIdentifier.contains(spec.id) {
+            for spec in Self.packSpecs where p.storeProduct.productIdentifier == spec.id {
                 m[spec.id] = p
             }
         }
