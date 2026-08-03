@@ -1,5 +1,5 @@
 diff --git a/android/app/src/main/java/com/fitrater/app/MainActivity.kt b/android/app/src/main/java/com/fitrater/app/MainActivity.kt
-index cc05466..14dc4c5 100644
+index a5052f2..72c53f2 100644
 --- a/android/app/src/main/java/com/fitrater/app/MainActivity.kt
 +++ b/android/app/src/main/java/com/fitrater/app/MainActivity.kt
 @@ -107,7 +107,8 @@ fun FitraterApp() {
@@ -24,36 +24,37 @@ index cc05466..14dc4c5 100644
                      is SessionStatus.Authenticated -> {
                          val uid = s.session.user?.id
 diff --git a/android/app/src/main/java/com/fitrater/app/data/billing/RcBilling.kt b/android/app/src/main/java/com/fitrater/app/data/billing/RcBilling.kt
-index 22e68c0..4c974a6 100644
+index fc54196..e1a8f7b 100644
 --- a/android/app/src/main/java/com/fitrater/app/data/billing/RcBilling.kt
 +++ b/android/app/src/main/java/com/fitrater/app/data/billing/RcBilling.kt
-@@ -40,13 +40,14 @@ object RcBilling {
-     private val _customerInfo = MutableStateFlow<CustomerInfo?>(null)
-     val customerInfo: StateFlow<CustomerInfo?> = _customerInfo.asStateFlow()
+@@ -43,13 +43,13 @@ object RcBilling {
+     /** Server-granted Pro flag from Supabase profile.is_pro. Lets ops grant Pro without a purchase. */
+     private val _serverPro = MutableStateFlow(false)
  
 -    private val _isPro = MutableStateFlow(false)
 +    private val _isPro = MutableStateFlow(com.fitrater.app.data.demo.Demo.on)
      /** Reactive Pro state. Compose can `collectAsState` this and pass it into feature-gate params. */
      val isPro: StateFlow<Boolean> = _isPro.asStateFlow()
  
-     private fun publish(info: CustomerInfo?) {
-         _customerInfo.value = info
--        _isPro.value = info?.entitlements?.get(ENTITLEMENT_PRO)?.isActive == true
-+        _isPro.value = com.fitrater.app.data.demo.Demo.on ||
-+            info?.entitlements?.get(ENTITLEMENT_PRO)?.isActive == true
+     private fun recompute() {
+         val rc = _customerInfo.value?.entitlements?.get(ENTITLEMENT_PRO)?.isActive == true
+-        _isPro.value = rc || _serverPro.value
++        _isPro.value = com.fitrater.app.data.demo.Demo.on || rc || _serverPro.value
      }
  
-     fun init(context: Context, apiKey: String) {
-@@ -110,6 +111,7 @@ object RcBilling {
+     private fun publish(info: CustomerInfo?) {
+@@ -127,7 +127,8 @@ object RcBilling {
      }
  
      fun isPro(info: CustomerInfo? = _customerInfo.value): Boolean =
-+        if (com.fitrater.app.data.demo.Demo.on) true else
-         info?.entitlements?.get(ENTITLEMENT_PRO)?.isActive == true
+-        _serverPro.value || info?.entitlements?.get(ENTITLEMENT_PRO)?.isActive == true
++        if (com.fitrater.app.data.demo.Demo.on) true
++        else _serverPro.value || info?.entitlements?.get(ENTITLEMENT_PRO)?.isActive == true
  
      /** True if the user is inside the 7-day intro (free trial) window of the annual sub. */
+     suspend fun isInTrial(): Boolean {
 diff --git a/android/app/src/main/java/com/fitrater/app/data/repo/Repo.kt b/android/app/src/main/java/com/fitrater/app/data/repo/Repo.kt
-index cb0d103..491cecd 100644
+index 7e9533e..8d90b0c 100644
 --- a/android/app/src/main/java/com/fitrater/app/data/repo/Repo.kt
 +++ b/android/app/src/main/java/com/fitrater/app/data/repo/Repo.kt
 @@ -1,6 +1,7 @@
@@ -61,10 +62,10 @@ index cb0d103..491cecd 100644
  
  import com.fitrater.app.data.Supa
 +import com.fitrater.app.data.demo.Demo
- import com.fitrater.app.data.model.ClosetItem
- import com.fitrater.app.data.model.ClosetItemInsert
- import com.fitrater.app.data.model.CreditPack
-@@ -55,10 +56,13 @@ object Repo {
+ import com.fitrater.app.data.model.BodyProfile
+ import com.fitrater.app.data.model.BodyProfileResponse
+ import com.fitrater.app.data.model.DecodeInvitationResponse
+@@ -74,10 +75,13 @@ object Repo {
      private val storage get() = Supa.client.storage
      private val functions get() = Supa.client.functions
  
@@ -80,7 +81,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: return null
          return db["profiles"].select {
              filter { eq("id", uid) }
-@@ -71,6 +75,7 @@ object Repo {
+@@ -90,6 +94,7 @@ object Repo {
      }
  
      suspend fun markFirstRunDone() {
@@ -88,7 +89,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: return
          runCatching {
              db["profiles"].update({ set("first_run_done", true) }) {
-@@ -80,6 +85,7 @@ object Repo {
+@@ -99,6 +104,7 @@ object Repo {
      }
  
      suspend fun closetItemCount(): Int {
@@ -96,7 +97,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: return 0
          return runCatching {
              db["closet_items"].select(Columns.list("id")) {
-@@ -119,6 +125,7 @@ object Repo {
+@@ -138,6 +144,7 @@ object Repo {
      }
  
      suspend fun latestOutfit(): Outfit? {
@@ -104,7 +105,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: return null
          val raw = db["outfits"].select {
              filter { eq("user_id", uid) }
-@@ -133,6 +140,7 @@ object Repo {
+@@ -152,6 +159,7 @@ object Repo {
       * whichever has the newer created_at. Signed URL is resolved for both.
       */
      suspend fun latestActivity(): LatestActivity? {
@@ -112,7 +113,7 @@ index cb0d103..491cecd 100644
          val outfit = runCatching { latestOutfit() }.getOrNull()
          val piece = runCatching {
              val uid = userId ?: return@runCatching null
-@@ -163,6 +171,7 @@ object Repo {
+@@ -182,6 +190,7 @@ object Repo {
      }
  
      suspend fun outfits(limit: Long = 20): List<Outfit> {
@@ -120,7 +121,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: return emptyList()
          val raw = db["outfits"].select {
              filter { eq("user_id", uid) }
-@@ -173,11 +182,13 @@ object Repo {
+@@ -192,11 +201,13 @@ object Repo {
      }
  
      suspend fun outfitById(id: String): Outfit? {
@@ -134,7 +135,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: return null
          val raw = db["outfits"].select {
              filter { eq("user_id", uid) }
-@@ -188,6 +199,7 @@ object Repo {
+@@ -207,6 +218,7 @@ object Repo {
      }
  
      suspend fun averageScore(): Double? {
@@ -142,7 +143,7 @@ index cb0d103..491cecd 100644
          val list = outfits(50)
          val scored = list.filter { o -> (o.kind == null || o.kind == "score" || o.kind == "user_scan") }
              .mapNotNull { it.score }
-@@ -197,10 +209,12 @@ object Repo {
+@@ -216,10 +228,12 @@ object Repo {
      }
  
      suspend fun insertOutfit(o: OutfitInsert): Outfit {
@@ -155,7 +156,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: error("Not signed in")
          val path = "$uid/${java.util.UUID.randomUUID()}.$ext"
          storage.from("outfits").upload(path, bytes) {
-@@ -209,22 +223,30 @@ object Repo {
+@@ -228,22 +242,30 @@ object Repo {
          return path
      }
  
@@ -192,7 +193,7 @@ index cb0d103..491cecd 100644
          return db["closet_items"].insert(item) { select() }.decodeSingle<ClosetItem>()
      }
  
-@@ -235,6 +257,7 @@ object Repo {
+@@ -254,6 +276,7 @@ object Repo {
      }.getOrDefault(emptyList())
  
      suspend fun closetItems(limit: Long = 40): List<ClosetItem> {
@@ -200,7 +201,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: return emptyList()
          return db["closet_items"].select {
              filter { eq("user_id", uid) }
-@@ -244,6 +267,7 @@ object Repo {
+@@ -263,6 +286,7 @@ object Repo {
      }
  
      suspend fun latestSundayLetter(): SundayLetter? {
@@ -208,7 +209,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: return null
          return db["sunday_letters"].select {
              filter { eq("user_id", uid) }
-@@ -292,6 +316,7 @@ object Repo {
+@@ -311,6 +335,7 @@ object Repo {
      }
  
      suspend fun latestHemNote(): HemNote? {
@@ -216,7 +217,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: return null
          return db["hem_notes"].select {
              filter { eq("user_id", uid) }
-@@ -301,6 +326,7 @@ object Repo {
+@@ -320,6 +345,7 @@ object Repo {
      }
  
      suspend fun credits(): Int {
@@ -224,7 +225,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: return 0
          val rows = db["credit_transactions"].select(Columns.list("amount")) {
              filter { eq("user_id", uid) }
-@@ -309,6 +335,7 @@ object Repo {
+@@ -328,6 +354,7 @@ object Repo {
      }
  
      suspend fun grantSignupCreditsIfEmpty() {
@@ -232,7 +233,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: return
          val existing = db["credit_transactions"].select(Columns.list("id")) {
              filter { eq("user_id", uid) }
-@@ -322,6 +349,7 @@ object Repo {
+@@ -341,6 +368,7 @@ object Repo {
      }
  
      suspend fun pushSettings(): PushSettings? {
@@ -240,7 +241,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: return null
          return db["push_settings"].select {
              filter { eq("user_id", uid) }
-@@ -330,6 +358,7 @@ object Repo {
+@@ -349,6 +377,7 @@ object Repo {
      }
  
      suspend fun spendCredits(amount: Int, kind: String) {
@@ -248,7 +249,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: error("Not signed in")
          val current = credits()
          val next = current - amount
-@@ -342,6 +371,7 @@ object Repo {
+@@ -361,6 +390,7 @@ object Repo {
       * Used to enforce Free-tier's 1 roast/day cap so Brutal-mode stays a Pro teaser.
       */
      suspend fun roastsToday(): Int {
@@ -256,7 +257,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: return 0
          val startOfToday = java.time.LocalDate.now()
              .atStartOfDay(java.time.ZoneId.systemDefault())
-@@ -362,6 +392,7 @@ object Repo {
+@@ -381,6 +411,7 @@ object Repo {
  
      /** Sum of credits spent (positive number) today in the device's local timezone. */
      suspend fun creditsSpentToday(): Int {
@@ -264,7 +265,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: return 0
          val startOfToday = java.time.LocalDate.now()
              .atStartOfDay(java.time.ZoneId.systemDefault())
-@@ -380,6 +411,7 @@ object Repo {
+@@ -399,6 +430,7 @@ object Repo {
  
      /** Sum of credits spent (positive number) since the first of this month, device local. */
      suspend fun creditsSpentThisMonth(): Int {
@@ -272,7 +273,7 @@ index cb0d103..491cecd 100644
          val uid = userId ?: return 0
          val today = java.time.LocalDate.now()
          val startOfMonth = today.withDayOfMonth(1)
-@@ -524,6 +556,7 @@ object Repo {
+@@ -810,6 +842,7 @@ object Repo {
  
      /** Composite stats block for the You sheet. */
      suspend fun stats(): Stats {
@@ -280,7 +281,7 @@ index cb0d103..491cecd 100644
          val piecesCount = runCatching { closetItems(500).size }.getOrDefault(0)
          val outfits = runCatching { outfits(500) }.getOrDefault(emptyList())
          val looksCount = outfits.size
-@@ -636,6 +669,7 @@ object Repo {
+@@ -922,6 +955,7 @@ object Repo {
  
      /** Read the paywall_shown flag defensively — returns false if the column doesn't exist yet. */
      suspend fun paywallShown(): Boolean {
@@ -325,10 +326,10 @@ index f8bf63d..9a19b54 100644
          val resp: HttpResponse = Supa.client.functions.invoke("decode-outfit", body = payload)
          val text: String = resp.body()
 diff --git a/android/app/src/main/java/com/fitrater/app/data/service/HemService.kt b/android/app/src/main/java/com/fitrater/app/data/service/HemService.kt
-index 0878f33..7fca12d 100644
+index d725474..f722732 100644
 --- a/android/app/src/main/java/com/fitrater/app/data/service/HemService.kt
 +++ b/android/app/src/main/java/com/fitrater/app/data/service/HemService.kt
-@@ -49,6 +49,18 @@ object HemService {
+@@ -59,6 +59,18 @@ object HemService {
  
      /** Real scoring path. Throws on non-recoverable model/parse errors. */
      suspend fun score(imageUrl: String, occasion: String, honesty: String): HemScored {
@@ -395,7 +396,7 @@ index 17cdaf8..19235fe 100644
          if (pending != null) {
              capturedBytes = pending
 diff --git a/android/app/src/main/java/com/fitrater/app/ui/screens/camera/TryOnScreen.kt b/android/app/src/main/java/com/fitrater/app/ui/screens/camera/TryOnScreen.kt
-index 51e73b7..a9dac7e 100644
+index 8a8102a..029c8aa 100644
 --- a/android/app/src/main/java/com/fitrater/app/ui/screens/camera/TryOnScreen.kt
 +++ b/android/app/src/main/java/com/fitrater/app/ui/screens/camera/TryOnScreen.kt
 @@ -145,6 +145,19 @@ fun TryOnScreen(
