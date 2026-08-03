@@ -1,0 +1,436 @@
+diff --git a/android/app/src/main/java/com/fitrater/app/MainActivity.kt b/android/app/src/main/java/com/fitrater/app/MainActivity.kt
+index cc05466..14dc4c5 100644
+--- a/android/app/src/main/java/com/fitrater/app/MainActivity.kt
++++ b/android/app/src/main/java/com/fitrater/app/MainActivity.kt
+@@ -107,7 +107,8 @@ fun FitraterApp() {
+             // Compute start destination synchronously from any already-loaded session,
+             // so a returning signed-in user never sees the Splash/SignIn screens flash.
+             val initialStart = remember {
+-                if (Supa.client.auth.currentSessionOrNull() != null) Route.Shell else Route.Splash
++                if (com.fitrater.app.data.demo.Demo.on) Route.Shell
++                else if (Supa.client.auth.currentSessionOrNull() != null) Route.Shell else Route.Splash
+             }
+ 
+             val focusManager = LocalFocusManager.current
+@@ -137,6 +138,10 @@ fun FitraterApp() {
+             // Auth routing
+             var lastHandledUid by remember { mutableStateOf<String?>(null) }
+             LaunchedEffect(sessionStatus) {
++                if (com.fitrater.app.data.demo.Demo.on) {
++                    com.fitrater.app.util.CreditsBus.refresh()
++                    return@LaunchedEffect
++                }
+                 when (val s = sessionStatus) {
+                     is SessionStatus.Authenticated -> {
+                         val uid = s.session.user?.id
+diff --git a/android/app/src/main/java/com/fitrater/app/data/billing/RcBilling.kt b/android/app/src/main/java/com/fitrater/app/data/billing/RcBilling.kt
+index 22e68c0..4c974a6 100644
+--- a/android/app/src/main/java/com/fitrater/app/data/billing/RcBilling.kt
++++ b/android/app/src/main/java/com/fitrater/app/data/billing/RcBilling.kt
+@@ -40,13 +40,14 @@ object RcBilling {
+     private val _customerInfo = MutableStateFlow<CustomerInfo?>(null)
+     val customerInfo: StateFlow<CustomerInfo?> = _customerInfo.asStateFlow()
+ 
+-    private val _isPro = MutableStateFlow(false)
++    private val _isPro = MutableStateFlow(com.fitrater.app.data.demo.Demo.on)
+     /** Reactive Pro state. Compose can `collectAsState` this and pass it into feature-gate params. */
+     val isPro: StateFlow<Boolean> = _isPro.asStateFlow()
+ 
+     private fun publish(info: CustomerInfo?) {
+         _customerInfo.value = info
+-        _isPro.value = info?.entitlements?.get(ENTITLEMENT_PRO)?.isActive == true
++        _isPro.value = com.fitrater.app.data.demo.Demo.on ||
++            info?.entitlements?.get(ENTITLEMENT_PRO)?.isActive == true
+     }
+ 
+     fun init(context: Context, apiKey: String) {
+@@ -110,6 +111,7 @@ object RcBilling {
+     }
+ 
+     fun isPro(info: CustomerInfo? = _customerInfo.value): Boolean =
++        if (com.fitrater.app.data.demo.Demo.on) true else
+         info?.entitlements?.get(ENTITLEMENT_PRO)?.isActive == true
+ 
+     /** True if the user is inside the 7-day intro (free trial) window of the annual sub. */
+diff --git a/android/app/src/main/java/com/fitrater/app/data/repo/Repo.kt b/android/app/src/main/java/com/fitrater/app/data/repo/Repo.kt
+index cb0d103..491cecd 100644
+--- a/android/app/src/main/java/com/fitrater/app/data/repo/Repo.kt
++++ b/android/app/src/main/java/com/fitrater/app/data/repo/Repo.kt
+@@ -1,6 +1,7 @@
+ package com.fitrater.app.data.repo
+ 
+ import com.fitrater.app.data.Supa
++import com.fitrater.app.data.demo.Demo
+ import com.fitrater.app.data.model.ClosetItem
+ import com.fitrater.app.data.model.ClosetItemInsert
+ import com.fitrater.app.data.model.CreditPack
+@@ -55,10 +56,13 @@ object Repo {
+     private val storage get() = Supa.client.storage
+     private val functions get() = Supa.client.functions
+ 
+-    val userId: String? get() = auth.currentUserOrNull()?.id
+-    val userEmail: String? get() = auth.currentUserOrNull()?.email
++    val userId: String? get() =
++        if (Demo.on) "demo-user" else auth.currentUserOrNull()?.id
++    val userEmail: String? get() =
++        if (Demo.on) Demo.profile.email else auth.currentUserOrNull()?.email
+ 
+     suspend fun currentProfile(): Profile? {
++        if (Demo.on) return Demo.profile
+         val uid = userId ?: return null
+         return db["profiles"].select {
+             filter { eq("id", uid) }
+@@ -71,6 +75,7 @@ object Repo {
+     }
+ 
+     suspend fun markFirstRunDone() {
++        if (Demo.on) return
+         val uid = userId ?: return
+         runCatching {
+             db["profiles"].update({ set("first_run_done", true) }) {
+@@ -80,6 +85,7 @@ object Repo {
+     }
+ 
+     suspend fun closetItemCount(): Int {
++        if (Demo.on) return Demo.closet.size
+         val uid = userId ?: return 0
+         return runCatching {
+             db["closet_items"].select(Columns.list("id")) {
+@@ -119,6 +125,7 @@ object Repo {
+     }
+ 
+     suspend fun latestOutfit(): Outfit? {
++        if (Demo.on) return Demo.latest
+         val uid = userId ?: return null
+         val raw = db["outfits"].select {
+             filter { eq("user_id", uid) }
+@@ -133,6 +140,7 @@ object Repo {
+      * whichever has the newer created_at. Signed URL is resolved for both.
+      */
+     suspend fun latestActivity(): LatestActivity? {
++        if (Demo.on) return Demo.latestActivity
+         val outfit = runCatching { latestOutfit() }.getOrNull()
+         val piece = runCatching {
+             val uid = userId ?: return@runCatching null
+@@ -163,6 +171,7 @@ object Repo {
+     }
+ 
+     suspend fun outfits(limit: Long = 20): List<Outfit> {
++        if (Demo.on) return Demo.outfits.take(limit.toInt())
+         val uid = userId ?: return emptyList()
+         val raw = db["outfits"].select {
+             filter { eq("user_id", uid) }
+@@ -173,11 +182,13 @@ object Repo {
+     }
+ 
+     suspend fun outfitById(id: String): Outfit? {
++        if (Demo.on) return Demo.outfits.firstOrNull { it.id == id }
+         val raw = db["outfits"].select { filter { eq("id", id) }; limit(1) }.data
+         return decodeOutfitsSafe(raw).firstOrNull()
+     }
+ 
+     suspend fun bestOutfit(): Outfit? {
++        if (Demo.on) return Demo.best
+         val uid = userId ?: return null
+         val raw = db["outfits"].select {
+             filter { eq("user_id", uid) }
+@@ -188,6 +199,7 @@ object Repo {
+     }
+ 
+     suspend fun averageScore(): Double? {
++        if (Demo.on) return Demo.average
+         val list = outfits(50)
+         val scored = list.filter { o -> (o.kind == null || o.kind == "score" || o.kind == "user_scan") }
+             .mapNotNull { it.score }
+@@ -197,10 +209,12 @@ object Repo {
+     }
+ 
+     suspend fun insertOutfit(o: OutfitInsert): Outfit {
++        if (Demo.on) return Demo.outfits[0]
+         return db["outfits"].insert(o) { select() }.decodeSingle<Outfit>()
+     }
+ 
+     suspend fun uploadOutfitPhoto(bytes: ByteArray, ext: String = "jpg"): String {
++        if (Demo.on) return Demo.SCORE_PHOTO
+         val uid = userId ?: error("Not signed in")
+         val path = "$uid/${java.util.UUID.randomUUID()}.$ext"
+         storage.from("outfits").upload(path, bytes) {
+@@ -209,22 +223,30 @@ object Repo {
+         return path
+     }
+ 
+-    suspend fun signedOutfitUrl(path: String): String? = runCatching {
+-        storage.from("outfits").createSignedUrl(path, 1.hours)
+-    }.getOrNull()
++    suspend fun signedOutfitUrl(path: String): String? {
++        if (Demo.on) return Demo.signedUrl(path)
++        return runCatching {
++            storage.from("outfits").createSignedUrl(path, 1.hours)
++        }.getOrNull()
++    }
+ 
+     suspend fun uploadClosetPhoto(bytes: ByteArray, ext: String = "jpg"): String {
++        if (Demo.on) return Demo.DECODE_PHOTO
+         val uid = userId ?: error("Not signed in")
+         val path = "$uid/${java.util.UUID.randomUUID()}.$ext"
+         storage.from("closet").upload(path, bytes) { upsert = false }
+         return path
+     }
+ 
+-    suspend fun signedClosetUrl(path: String): String? = runCatching {
+-        storage.from("closet").createSignedUrl(path, 1.hours)
+-    }.getOrNull()
++    suspend fun signedClosetUrl(path: String): String? {
++        if (Demo.on) return Demo.signedUrl(path)
++        return runCatching {
++            storage.from("closet").createSignedUrl(path, 1.hours)
++        }.getOrNull()
++    }
+ 
+     suspend fun insertClosetItem(item: ClosetItemInsert): ClosetItem {
++        if (Demo.on) return Demo.closet[0]
+         return db["closet_items"].insert(item) { select() }.decodeSingle<ClosetItem>()
+     }
+ 
+@@ -235,6 +257,7 @@ object Repo {
+     }.getOrDefault(emptyList())
+ 
+     suspend fun closetItems(limit: Long = 40): List<ClosetItem> {
++        if (Demo.on) return Demo.closet.take(limit.toInt())
+         val uid = userId ?: return emptyList()
+         return db["closet_items"].select {
+             filter { eq("user_id", uid) }
+@@ -244,6 +267,7 @@ object Repo {
+     }
+ 
+     suspend fun latestSundayLetter(): SundayLetter? {
++        if (Demo.on) return Demo.letter
+         val uid = userId ?: return null
+         return db["sunday_letters"].select {
+             filter { eq("user_id", uid) }
+@@ -292,6 +316,7 @@ object Repo {
+     }
+ 
+     suspend fun latestHemNote(): HemNote? {
++        if (Demo.on) return Demo.hemNote
+         val uid = userId ?: return null
+         return db["hem_notes"].select {
+             filter { eq("user_id", uid) }
+@@ -301,6 +326,7 @@ object Repo {
+     }
+ 
+     suspend fun credits(): Int {
++        if (Demo.on) return Demo.credits
+         val uid = userId ?: return 0
+         val rows = db["credit_transactions"].select(Columns.list("amount")) {
+             filter { eq("user_id", uid) }
+@@ -309,6 +335,7 @@ object Repo {
+     }
+ 
+     suspend fun grantSignupCreditsIfEmpty() {
++        if (Demo.on) return
+         val uid = userId ?: return
+         val existing = db["credit_transactions"].select(Columns.list("id")) {
+             filter { eq("user_id", uid) }
+@@ -322,6 +349,7 @@ object Repo {
+     }
+ 
+     suspend fun pushSettings(): PushSettings? {
++        if (Demo.on) return Demo.push
+         val uid = userId ?: return null
+         return db["push_settings"].select {
+             filter { eq("user_id", uid) }
+@@ -330,6 +358,7 @@ object Repo {
+     }
+ 
+     suspend fun spendCredits(amount: Int, kind: String) {
++        if (Demo.on) return
+         val uid = userId ?: error("Not signed in")
+         val current = credits()
+         val next = current - amount
+@@ -342,6 +371,7 @@ object Repo {
+      * Used to enforce Free-tier's 1 roast/day cap so Brutal-mode stays a Pro teaser.
+      */
+     suspend fun roastsToday(): Int {
++        if (Demo.on) return 0
+         val uid = userId ?: return 0
+         val startOfToday = java.time.LocalDate.now()
+             .atStartOfDay(java.time.ZoneId.systemDefault())
+@@ -362,6 +392,7 @@ object Repo {
+ 
+     /** Sum of credits spent (positive number) today in the device's local timezone. */
+     suspend fun creditsSpentToday(): Int {
++        if (Demo.on) return 12
+         val uid = userId ?: return 0
+         val startOfToday = java.time.LocalDate.now()
+             .atStartOfDay(java.time.ZoneId.systemDefault())
+@@ -380,6 +411,7 @@ object Repo {
+ 
+     /** Sum of credits spent (positive number) since the first of this month, device local. */
+     suspend fun creditsSpentThisMonth(): Int {
++        if (Demo.on) return 96
+         val uid = userId ?: return 0
+         val today = java.time.LocalDate.now()
+         val startOfMonth = today.withDayOfMonth(1)
+@@ -524,6 +556,7 @@ object Repo {
+ 
+     /** Composite stats block for the You sheet. */
+     suspend fun stats(): Stats {
++        if (Demo.on) return Demo.stats
+         val piecesCount = runCatching { closetItems(500).size }.getOrDefault(0)
+         val outfits = runCatching { outfits(500) }.getOrDefault(emptyList())
+         val looksCount = outfits.size
+@@ -636,6 +669,7 @@ object Repo {
+ 
+     /** Read the paywall_shown flag defensively — returns false if the column doesn't exist yet. */
+     suspend fun paywallShown(): Boolean {
++        if (Demo.on) return true
+         val uid = userId ?: return true
+         return runCatching {
+             val raw = db["profiles"].select(Columns.list("paywall_shown")) {
+diff --git a/android/app/src/main/java/com/fitrater/app/data/service/CompareService.kt b/android/app/src/main/java/com/fitrater/app/data/service/CompareService.kt
+index f8bf63d..9a19b54 100644
+--- a/android/app/src/main/java/com/fitrater/app/data/service/CompareService.kt
++++ b/android/app/src/main/java/com/fitrater/app/data/service/CompareService.kt
+@@ -43,6 +43,13 @@ object CompareService {
+     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+ 
+     suspend fun compare(aUrl: String, bUrl: String, occasion: String): CompareResponse {
++        if (com.fitrater.app.data.demo.Demo.on) {
++            val d = com.fitrater.app.data.demo.Demo
++            return CompareResponse(
++                winner = d.versusWinner, score_a = d.versusScoreA, score_b = d.versusScoreB,
++                comment = d.versusComment, reason_a = d.versusReasonA, reason_b = d.versusReasonB,
++            )
++        }
+         val payload = buildJsonObject {
+             put("image_a_url", aUrl)
+             put("image_b_url", bUrl)
+@@ -56,6 +63,17 @@ object CompareService {
+     }
+ 
+     suspend fun decode(imageUrl: String): DecodeResponse {
++        if (com.fitrater.app.data.demo.Demo.on) {
++            val d = com.fitrater.app.data.demo.Demo
++            return DecodeResponse(
++                pieces = d.decodePieces.map {
++                    DecodePiece(type = it.first, silhouette = it.second,
++                                colors = emptyList(), fabric = it.third, note = "")
++                },
++                palette_hex = d.decodePalette,
++                style_signature = d.decodeSignature,
++            )
++        }
+         val payload = buildJsonObject { put("image_url", imageUrl) }
+         val resp: HttpResponse = Supa.client.functions.invoke("decode-outfit", body = payload)
+         val text: String = resp.body()
+diff --git a/android/app/src/main/java/com/fitrater/app/data/service/HemService.kt b/android/app/src/main/java/com/fitrater/app/data/service/HemService.kt
+index 0878f33..7fca12d 100644
+--- a/android/app/src/main/java/com/fitrater/app/data/service/HemService.kt
++++ b/android/app/src/main/java/com/fitrater/app/data/service/HemService.kt
+@@ -49,6 +49,18 @@ object HemService {
+ 
+     /** Real scoring path. Throws on non-recoverable model/parse errors. */
+     suspend fun score(imageUrl: String, occasion: String, honesty: String): HemScored {
++        if (com.fitrater.app.data.demo.Demo.on) {
++            val d = com.fitrater.app.data.demo.Demo
++            return if (honesty == "brutal") HemScored(
++                score = d.roastScore, hemComment = d.roastComment,
++                subscores = com.fitrater.app.data.model.Subscores(7.0, 7.4, 7.1, 7.3),
++                swaps = emptyList(), annotations = emptyList(),
++            ) else HemScored(
++                score = d.outfits[0].score!!, hemComment = d.outfits[0].hem_comment!!,
++                subscores = d.outfits[0].subscores!!,
++                swaps = d.outfits[0].swaps!!, annotations = d.outfits[0].annotations!!,
++            )
++        }
+         val payload: JsonObject = buildJsonObject {
+             put("image_url", imageUrl)
+             put("occasion", occasion)
+diff --git a/android/app/src/main/java/com/fitrater/app/ui/screens/camera/DecodeScreen.kt b/android/app/src/main/java/com/fitrater/app/ui/screens/camera/DecodeScreen.kt
+index b9b9c30..ddabe04 100644
+--- a/android/app/src/main/java/com/fitrater/app/ui/screens/camera/DecodeScreen.kt
++++ b/android/app/src/main/java/com/fitrater/app/ui/screens/camera/DecodeScreen.kt
+@@ -68,7 +68,13 @@ fun DecodeScreen(
+ ) {
+     val context = LocalContext.current
+     val scope = rememberCoroutineScope()
+-    var pickedUri by remember { mutableStateOf<Uri?>(null) }
++    var pickedUri by remember {
++        mutableStateOf<Uri?>(
++            if (com.fitrater.app.data.demo.Demo.on)
++                Uri.parse("file:///android_asset/demo/" + com.fitrater.app.data.demo.Demo.DECODE_PHOTO)
++            else null,
++        )
++    }
+     var busy by remember { mutableStateOf(false) }
+     var error by remember { mutableStateOf<String?>(null) }
+     var result by remember { mutableStateOf<DecodeResponse?>(null) }
+@@ -248,7 +254,11 @@ fun DecodeScreen(
+                             }
+                             runCatching {
+                                 val bytes = withContext(Dispatchers.IO) {
+-                                    context.contentResolver.openInputStream(pickedUri!!)?.buffered()?.use { it.readBytes() }
++                                    if (com.fitrater.app.data.demo.Demo.on)
++                                        com.fitrater.app.data.demo.Demo.assetBytes(
++                                            context, com.fitrater.app.data.demo.Demo.DECODE_PHOTO)
++                                    else context.contentResolver.openInputStream(pickedUri!!)
++                                        ?.buffered()?.use { it.readBytes() }
+                                 } ?: error("Could not read photo")
+                                 // Reference photos go into `closet` bucket → signed URL for FAL to fetch.
+                                 val path = withContext(Dispatchers.IO) { Repo.uploadClosetPhoto(bytes) }
+diff --git a/android/app/src/main/java/com/fitrater/app/ui/screens/camera/RoastScreen.kt b/android/app/src/main/java/com/fitrater/app/ui/screens/camera/RoastScreen.kt
+index 17cdaf8..19235fe 100644
+--- a/android/app/src/main/java/com/fitrater/app/ui/screens/camera/RoastScreen.kt
++++ b/android/app/src/main/java/com/fitrater/app/ui/screens/camera/RoastScreen.kt
+@@ -82,6 +82,10 @@ fun RoastScreen(
+     var roastComment by remember { mutableStateOf<String?>(null) }
+ 
+     LaunchedEffect(Unit) {
++        if (com.fitrater.app.data.demo.Demo.on && capturedBytes == null) {
++            capturedBytes = com.fitrater.app.data.demo.Demo
++                .assetBytes(context, com.fitrater.app.data.demo.Demo.ROAST_PHOTO)
++        }
+         val pending = com.fitrater.app.util.CameraBus.consume()
+         if (pending != null) {
+             capturedBytes = pending
+diff --git a/android/app/src/main/java/com/fitrater/app/ui/screens/camera/TryOnScreen.kt b/android/app/src/main/java/com/fitrater/app/ui/screens/camera/TryOnScreen.kt
+index 51e73b7..a9dac7e 100644
+--- a/android/app/src/main/java/com/fitrater/app/ui/screens/camera/TryOnScreen.kt
++++ b/android/app/src/main/java/com/fitrater/app/ui/screens/camera/TryOnScreen.kt
+@@ -145,6 +145,19 @@ fun TryOnScreen(
+     }
+ 
+     LaunchedEffect(Unit) {
++        if (com.fitrater.app.data.demo.Demo.on) {
++            // Open straight on the result state so the capture shows the finished look
++            // rather than the two empty pickers.
++            pieces = com.fitrater.app.data.demo.Demo.closet
++            loadingPieces = false
++            pickedPiece = pieces.firstOrNull { it.id == "c6" }
++            pickedPieceUrl = com.fitrater.app.data.demo.Demo
++                .signedUrl(com.fitrater.app.data.demo.Demo.closet.first { it.id == "c6" }.image_path!!)
++            resultUrl = com.fitrater.app.data.demo.Demo
++                .signedUrl(com.fitrater.app.data.demo.Demo.TRYON_RESULT)
++            savedOk = true
++            return@LaunchedEffect
++        }
+         // Belt-and-suspenders: Try-on is Pro-only. If a Free user lands here via deep link
+         // or state restoration, bounce them straight to the paywall.
+         val proNow = runCatching { com.fitrater.app.data.billing.RcBilling.refreshCustomerInfo() }
+diff --git a/android/app/src/main/java/com/fitrater/app/ui/screens/camera/VersusScreen.kt b/android/app/src/main/java/com/fitrater/app/ui/screens/camera/VersusScreen.kt
+index 3269515..7c47a10 100644
+--- a/android/app/src/main/java/com/fitrater/app/ui/screens/camera/VersusScreen.kt
++++ b/android/app/src/main/java/com/fitrater/app/ui/screens/camera/VersusScreen.kt
+@@ -81,6 +81,11 @@ fun VersusScreen(
+ 
+     // On return from CameraCaptureScreen, pull the pending bytes into the correct slot.
+     androidx.compose.runtime.LaunchedEffect(Unit) {
++        if (com.fitrater.app.data.demo.Demo.on) {
++            val d = com.fitrater.app.data.demo.Demo
++            if (aBytes == null) aBytes = d.assetBytes(context, d.VERSUS_A)
++            if (bBytes == null) bBytes = d.assetBytes(context, d.VERSUS_B)
++        }
+         val (slot, bytes) = com.fitrater.app.util.CameraBus.consumeWithSlot()
+         if (bytes != null && slot != null) {
+             if (slot == "A") { aBytes = bytes; aUri = null; com.fitrater.app.util.VersusBus.aBytes = bytes }

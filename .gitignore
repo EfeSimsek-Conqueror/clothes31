@@ -47,3 +47,19 @@ android/store/*.aab
 # Local
 local.properties
 *.log
+
+# Working docs & QA artifacts (Koragan / Android bugfixing) — do not commit
+context.md
+handoff.md
+IN-A-NUTSHELL.txt
+android/context.md
+android/handoff.md
+android/env.sh
+android/qa-screenshots/
+
+# Store assets: keep the JPGs and the composed sets, not the bulk intermediates.
+# photos/*.png are lossless masters (43 MB) — the JPGs are what the harness and the
+# listing use. raw/ is 75 MB of unframed captures, regenerable via recapture.sh.
+android/store/photos/*.png
+android/store/screenshots/raw/
+__pycache__/
