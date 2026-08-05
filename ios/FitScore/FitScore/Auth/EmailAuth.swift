@@ -13,4 +13,10 @@ enum EmailAuth {
             redirectTo: Supa.authCallbackURL
         )
     }
+
+    /// Email + password sign-in. Used for App Store demo accounts and any
+    /// user who prefers a password over the magic link.
+    static func signInWithPassword(email: String, password: String) async throws {
+        try await Supa.client.auth.signIn(email: email, password: password)
+    }
 }
