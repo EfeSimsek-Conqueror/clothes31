@@ -309,8 +309,8 @@ private fun ShareButton(onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Default.Share, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-            Text("Share Wrapped Card", style = HemType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White))
+            Icon(Icons.Default.Share, contentDescription = null, tint = HemColors.OnInk, modifier = Modifier.size(16.dp))
+            Text("Share Wrapped Card", style = HemType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = HemColors.OnInk))
         }
     }
 }

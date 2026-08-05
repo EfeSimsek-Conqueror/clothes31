@@ -1032,7 +1032,7 @@ fun StudioCreateScreen(
 
             if (error != null) {
                 Spacer(Modifier.height(HemSpace.md))
-                Text(error!!, style = HemType.bodyMuted.copy(color = Color(0xFFB0743A)))
+                Text(error!!, style = HemType.bodyMuted.copy(color = HemColors.Bronze))
             }
             Spacer(Modifier.height(HemSpace.xl))
         }
@@ -1113,7 +1113,7 @@ private fun WizardBottomBar(
                         .clickable(onClick = onGenerate)
                         .padding(horizontal = 18.dp, vertical = 10.dp),
                 ) {
-                    Text(label, style = HemType.body.copy(color = Color.White, fontWeight = FontWeight.SemiBold))
+                    Text(label, style = HemType.body.copy(color = HemColors.OnInk, fontWeight = FontWeight.SemiBold))
                 }
             } else {
                 Box(
@@ -1123,7 +1123,7 @@ private fun WizardBottomBar(
                         .clickable(enabled = canAdvance, onClick = onNext)
                         .padding(horizontal = 18.dp, vertical = 10.dp),
                 ) {
-                    Text("Next", style = HemType.body.copy(color = Color.White, fontWeight = FontWeight.SemiBold))
+                    Text("Next", style = HemType.body.copy(color = HemColors.OnInk, fontWeight = FontWeight.SemiBold))
                 }
             }
         }
@@ -1517,7 +1517,7 @@ private fun CustomHexRow(onAdd: (String) -> Unit) {
                 })
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
-            Text("+ Add", style = HemType.body.copy(color = Color.White, fontWeight = FontWeight.Medium))
+            Text("+ Add", style = HemType.body.copy(color = HemColors.OnInk, fontWeight = FontWeight.Medium))
         }
     }
 }
@@ -1569,7 +1569,7 @@ private fun ColorChip(
         Text(
             label,
             style = HemType.body.copy(
-                color = if (active) Color.White else HemColors.Ink,
+                color = if (active) HemColors.OnInk else HemColors.Ink,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
             ),
@@ -1804,7 +1804,7 @@ private fun Chip(text: String, active: Boolean, onClick: () -> Unit) {
         Text(
             text,
             style = HemType.body.copy(
-                color = if (active) Color.White else HemColors.Ink,
+                color = if (active) HemColors.OnInk else HemColors.Ink,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
             ),
@@ -1917,7 +1917,7 @@ private fun GeneratedResultScreen(
 
         if (errorText != null) {
             Spacer(Modifier.height(HemSpace.sm))
-            Text(errorText, style = HemType.bodyMuted.copy(color = Color(0xFFB0743A)))
+            Text(errorText, style = HemType.bodyMuted.copy(color = HemColors.Bronze))
         }
         if (addedOk) {
             Spacer(Modifier.height(HemSpace.sm))
@@ -2016,7 +2016,7 @@ private fun VariationTile(
                     Text(
                         "✓",
                         style = HemType.body.copy(
-                            color = Color.White,
+                            color = HemColors.OnAccent,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                         ),

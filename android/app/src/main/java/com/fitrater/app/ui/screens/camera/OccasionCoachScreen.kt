@@ -427,8 +427,8 @@ private fun PieceRow(p: OccasionPiece, onCopyPrompt: (String) -> Unit) {
         val gp = p.generate_prompt
         if (!cid.isNullOrBlank()) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF338853), modifier = Modifier.size(11.dp))
-                Text("IN CLOSET", style = HemType.smallLabel.copy(fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF338853), letterSpacing = 1.4.sp))
+                Icon(Icons.Default.Check, contentDescription = null, tint = HemColors.Success, modifier = Modifier.size(11.dp))
+                Text("IN CLOSET", style = HemType.smallLabel.copy(fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold, color = HemColors.Success, letterSpacing = 1.4.sp))
             }
         } else if (!gp.isNullOrBlank()) {
             Box(
@@ -458,7 +458,7 @@ private fun PrimaryBtn(text: String, enabled: Boolean, onClick: () -> Unit) {
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = HemType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White))
+        Text(text, style = HemType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = HemColors.OnInk))
     }
 }
 

@@ -272,7 +272,7 @@ fun TryOnScreen(
                             Text(
                                 label,
                                 style = HemType.body.copy(
-                                    color = if (active) Color.White else HemColors.Ink,
+                                    color = if (active) HemColors.OnInk else HemColors.Ink,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 13.sp,
                                 ),
@@ -309,19 +309,19 @@ fun TryOnScreen(
                                     Box(
                                         Modifier
                                             .fillMaxSize()
-                                            .background(Color.Black.copy(alpha = 0.35f)),
+                                            .background(HemColors.Scrim.copy(alpha = 0.35f)),
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             androidx.compose.material3.CircularProgressIndicator(
                                                 strokeWidth = 2.dp,
-                                                color = Color.White,
+                                                color = HemColors.OnScrim,
                                                 modifier = Modifier.size(18.dp),
                                             )
                                             Spacer(Modifier.width(HemSpace.sm))
                                             Text(
                                                 "Uploading…",
-                                                style = HemType.body.copy(color = Color.White, fontWeight = FontWeight.SemiBold),
+                                                style = HemType.body.copy(color = HemColors.OnScrim, fontWeight = FontWeight.SemiBold),
                                             )
                                         }
                                     }
@@ -427,7 +427,7 @@ fun TryOnScreen(
 
                 if (error != null) {
                     Spacer(Modifier.height(HemSpace.sm))
-                    Text(error!!, style = HemType.bodyMuted.copy(color = Color(0xFFB0743A)))
+                    Text(error!!, style = HemType.bodyMuted.copy(color = HemColors.Bronze))
                 }
 
                 Spacer(Modifier.height(HemSpace.lg))

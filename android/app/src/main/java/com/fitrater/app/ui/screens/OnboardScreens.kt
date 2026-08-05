@@ -76,7 +76,7 @@ fun Onboard1Screen(onContinue: () -> Unit) {
 @Composable
 private fun OnboardChoiceCard(label: String, selected: Boolean, onClick: () -> Unit) {
     val bg = if (selected) HemColors.Ink else HemColors.CardCream
-    val fg = if (selected) Color.White else HemColors.Ink
+    val fg = if (selected) HemColors.OnInk else HemColors.Ink
     Box(
         Modifier
             .fillMaxWidth()
@@ -127,7 +127,7 @@ fun Onboard2Screen(onDone: () -> Unit) {
         })
         Spacer(Modifier.weight(1f))
         if (error != null) {
-            Text(error!!, style = HemType.bodyMuted.copy(color = Color(0xFFB0743A), fontSize = 13.sp))
+            Text(error!!, style = HemType.bodyMuted.copy(color = HemColors.Bronze, fontSize = 13.sp))
             Spacer(Modifier.height(HemSpace.xs))
         }
         PrimaryButton(
@@ -195,7 +195,7 @@ private fun Chip(
     modifier: Modifier = Modifier,
 ) {
     val bg = if (selected) HemColors.Ink else Color.Transparent
-    val fg = if (selected) Color.White else HemColors.Ink
+    val fg = if (selected) HemColors.OnInk else HemColors.Ink
     Box(
         modifier
             .height(44.dp)

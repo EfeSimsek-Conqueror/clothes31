@@ -177,7 +177,7 @@ fun VersusScreen(
                 }
                 if (error != null) {
                     Spacer(Modifier.height(HemSpace.sm))
-                    Text(error!!, style = HemType.bodyMuted.copy(color = Color(0xFFB0743A)))
+                    Text(error!!, style = HemType.bodyMuted.copy(color = HemColors.Bronze))
                 }
                 Spacer(Modifier.height(HemSpace.lg))
                 PrimaryButton(
@@ -405,7 +405,7 @@ private fun WinnerCard(
                         .background(HemColors.Bronze)
                         .padding(horizontal = 12.dp, vertical = 5.dp),
                 ) {
-                    Text("WINNER", style = HemType.smallLabel.copy(color = Color.White, letterSpacing = 2.sp))
+                    Text("WINNER", style = HemType.smallLabel.copy(color = HemColors.OnAccent, letterSpacing = 2.sp))
                 }
             }
         }

@@ -390,7 +390,7 @@ private fun BottomBar(
                 ) {
                     Text(
                         if (busy) "Setting…" else "Create · ${Supa.COVER_TEMPLATE_COST} credits",
-                        style = HemType.body.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White),
+                        style = HemType.body.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = HemColors.OnInk),
                     )
                 }
             } else {
@@ -404,7 +404,7 @@ private fun BottomBar(
                 ) {
                     Text(
                         "Next",
-                        style = HemType.body.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White),
+                        style = HemType.body.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = HemColors.OnInk),
                     )
                 }
             }
@@ -650,7 +650,7 @@ private fun Step5CoverLines(state: CoverWizardState) {
                         }),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Add, contentDescription = "Add", tint = HemColors.OnInk, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -782,7 +782,9 @@ private fun SummaryRow(label: String, value: String) {
 @Composable
 private fun LivePreviewCard(state: CoverWizardState) {
     val bg = parseHex(state.color) ?: HemColors.CardCream
-    val textColor = if (isDark(state.color)) Color.White else HemColors.Ink
+    // Contrast is against the user's chosen cover colour, not against the app theme —
+    // these two must stay literal or a dark-theme Ink (cream) lands on a pale cover.
+    val textColor = if (isDark(state.color)) Color.White else Color(0xFF141210)
     val centered = state.layout == "center"
     val align = if (centered) Alignment.CenterHorizontally else Alignment.Start
     val textAlign = if (centered) TextAlign.Center else TextAlign.Start

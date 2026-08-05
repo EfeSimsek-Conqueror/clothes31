@@ -143,7 +143,7 @@ fun YouScreen() {
                     Text(
                         option.replaceFirstChar { it.uppercase() },
                         style = HemType.body.copy(
-                            color = if (selected) Color.White else HemColors.Ink,
+                            color = if (selected) HemColors.OnInk else HemColors.Ink,
                             fontSize = 14.sp,
                         ),
                     )
@@ -164,7 +164,7 @@ fun YouScreen() {
                 },
                 colors = SwitchDefaults.colors(
                     checkedTrackColor = HemColors.Ink,
-                    checkedThumbColor = Color.White,
+                    checkedThumbColor = HemColors.OnInk,
                 ),
             )
         }
@@ -178,7 +178,7 @@ fun YouScreen() {
                 },
                 colors = SwitchDefaults.colors(
                     checkedTrackColor = HemColors.Ink,
-                    checkedThumbColor = Color.White,
+                    checkedThumbColor = HemColors.OnInk,
                 ),
             )
         }
@@ -192,7 +192,7 @@ fun YouScreen() {
                 },
                 colors = SwitchDefaults.colors(
                     checkedTrackColor = HemColors.Ink,
-                    checkedThumbColor = Color.White,
+                    checkedThumbColor = HemColors.OnInk,
                 ),
             )
         }

@@ -56,7 +56,7 @@ fun PaywallScreen(onContinue: () -> Unit) {
         ) {
             Text(
                 "FITSCORE PRO",
-                style = HemType.smallLabel.copy(color = Color.White, letterSpacing = 2.sp),
+                style = HemType.smallLabel.copy(color = HemColors.OnAccent, letterSpacing = 2.sp),
             )
         }
         Spacer(Modifier.height(HemSpace.md))
@@ -137,7 +137,7 @@ private fun PlanCard(
                         .background(HemColors.Bronze)
                         .padding(horizontal = 10.dp, vertical = 5.dp),
                 ) {
-                    Text(badge, style = HemType.smallLabel.copy(color = Color.White, letterSpacing = 1.5.sp))
+                    Text(badge, style = HemType.smallLabel.copy(color = HemColors.OnAccent, letterSpacing = 1.5.sp))
                 }
             }
         }

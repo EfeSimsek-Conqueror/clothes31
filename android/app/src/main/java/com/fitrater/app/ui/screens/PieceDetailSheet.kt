@@ -205,7 +205,7 @@ fun PieceDetailSheet(
                 Text(
                     "✎ Edit piece",
                     style = HemType.body.copy(
-                        color = Color.White,
+                        color = HemColors.OnInk,
                         fontWeight = FontWeight.SemiBold,
                     ),
                 )

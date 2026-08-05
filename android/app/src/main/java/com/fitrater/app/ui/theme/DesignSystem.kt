@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,17 +38,33 @@ import androidx.compose.ui.unit.sp
 import com.fitrater.app.R
 import java.util.Locale
 
-/** Palette from the design brief. */
+/**
+ * Palette from the design brief, resolved against the live theme.
+ *
+ * These are getters, not constants: each read is a snapshot read of [HemTheme.palette],
+ * so switching theme recomposes every screen that touches a token. See [HemPalette] for
+ * what each name means — in particular [OnInk] (not `Color.White`) for anything drawn on
+ * top of an [Ink] fill, since Ink is cream in dark mode.
+ */
 object HemColors {
-    val Paper = Color(0xFFF3EEE4)
-    val CardCream = Color(0xFFF7F2E8)
-    val Ink = Color(0xFF141210)
-    val Muted = Color(0xFF6B6459)
-    val Bronze = Color(0xFFB0743A)
-    val GoldStart = Color(0xFFC99A5B)
-    val GoldEnd = Color(0xFF8C6033)
-    val Hairline = Color(0x22141210)
-    val ChipBorder = Color(0x33141210)
+    val Paper: Color get() = HemTheme.palette.paper
+    val CardCream: Color get() = HemTheme.palette.cardCream
+    val Surface: Color get() = HemTheme.palette.surface
+    val Ink: Color get() = HemTheme.palette.ink
+    val OnInk: Color get() = HemTheme.palette.onInk
+    val Muted: Color get() = HemTheme.palette.muted
+    val Bronze: Color get() = HemTheme.palette.bronze
+    val GoldStart: Color get() = HemTheme.palette.goldStart
+    val GoldEnd: Color get() = HemTheme.palette.goldEnd
+    val OnAccent: Color get() = HemTheme.palette.onAccent
+    val Hairline: Color get() = HemTheme.palette.hairline
+    val ChipBorder: Color get() = HemTheme.palette.chipBorder
+    val Success: Color get() = HemTheme.palette.success
+    val Warning: Color get() = HemTheme.palette.warning
+    val Danger: Color get() = HemTheme.palette.danger
+    val Scrim: Color get() = HemTheme.palette.scrim
+    val OnScrim: Color get() = HemTheme.palette.onScrim
+    val IsDark: Boolean get() = HemTheme.palette.isDark
 }
 
 /** Spacing tokens. */
@@ -85,66 +102,102 @@ val SansFamily = FontFamily(
     Font(googleFont = inter, fontProvider = provider, weight = FontWeight.Bold),
 )
 
-/** Reusable text styles. */
+/**
+ * Reusable text styles.
+ *
+ * Sizes stay in `sp` and are scaled app-wide by the Text Size preference, which
+ * overrides `LocalDensity.fontScale` at the root (see `FitraterApp`) — that way the
+ * setting also reaches the many inline `.copy(fontSize = …)` call sites, not just
+ * these tokens.
+ *
+ * Colours follow the live palette. The styles are rebuilt only when the palette
+ * actually changes, so reading `HemType.body` in a hot composable stays cheap.
+ */
 object HemType {
-    val eyebrow = TextStyle(
-        fontFamily = SansFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 11.sp,
-        letterSpacing = 2.sp,
-        color = HemColors.Bronze,
-    )
-    val eyebrowMuted = eyebrow.copy(color = HemColors.Muted)
-    val serifDisplay = TextStyle(
-        fontFamily = SerifFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 40.sp,
-        lineHeight = 46.sp,
-        color = HemColors.Ink,
-    )
-    val serifTitle = TextStyle(
-        fontFamily = SerifFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 30.sp,
-        lineHeight = 36.sp,
-        color = HemColors.Ink,
-    )
-    val serifSection = TextStyle(
-        fontFamily = SerifFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
-        color = HemColors.Ink,
-    )
-    val serifQuote = TextStyle(
-        fontFamily = SerifFamily,
-        fontStyle = FontStyle.Italic,
-        fontSize = 18.sp,
-        lineHeight = 26.sp,
-        color = HemColors.Ink,
-    )
-    val body = TextStyle(
-        fontFamily = SansFamily,
-        fontSize = 15.sp,
-        lineHeight = 22.sp,
-        color = HemColors.Ink,
-    )
-    val bodyMuted = body.copy(color = HemColors.Muted)
-    val label = TextStyle(
-        fontFamily = SansFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 13.sp,
-        letterSpacing = 2.sp,
-        color = Color.White,
-    )
-    val labelInk = label.copy(color = HemColors.Ink)
-    val smallLabel = TextStyle(
-        fontFamily = SansFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 10.sp,
-        letterSpacing = 1.5.sp,
-        color = HemColors.Ink,
-    )
+    private class Styles(p: HemPalette) {
+        val eyebrow = TextStyle(
+            fontFamily = SansFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 11.sp,
+            letterSpacing = 2.sp,
+            color = p.bronze,
+        )
+        val eyebrowMuted = eyebrow.copy(color = p.muted)
+        val serifDisplay = TextStyle(
+            fontFamily = SerifFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = 40.sp,
+            lineHeight = 46.sp,
+            color = p.ink,
+        )
+        val serifTitle = TextStyle(
+            fontFamily = SerifFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = 30.sp,
+            lineHeight = 36.sp,
+            color = p.ink,
+        )
+        val serifSection = TextStyle(
+            fontFamily = SerifFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = 22.sp,
+            lineHeight = 28.sp,
+            color = p.ink,
+        )
+        val serifQuote = TextStyle(
+            fontFamily = SerifFamily,
+            fontStyle = FontStyle.Italic,
+            fontSize = 18.sp,
+            lineHeight = 26.sp,
+            color = p.ink,
+        )
+        val body = TextStyle(
+            fontFamily = SansFamily,
+            fontSize = 15.sp,
+            lineHeight = 22.sp,
+            color = p.ink,
+        )
+        val bodyMuted = body.copy(color = p.muted)
+        val label = TextStyle(
+            fontFamily = SansFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
+            letterSpacing = 2.sp,
+            color = p.onInk,
+        )
+        val labelInk = label.copy(color = p.ink)
+        val smallLabel = TextStyle(
+            fontFamily = SansFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 10.sp,
+            letterSpacing = 1.5.sp,
+            color = p.ink,
+        )
+    }
+
+    @Volatile
+    private var cached: Pair<HemPalette, Styles>? = null
+
+    private val current: Styles
+        get() {
+            // Reading HemTheme.palette here is what registers the snapshot read on the
+            // caller's behalf, so composables that only touch HemType still recompose.
+            val p = HemTheme.palette
+            cached?.let { (key, styles) -> if (key == p) return styles }
+            return Styles(p).also { cached = p to it }
+        }
+
+    val eyebrow: TextStyle get() = current.eyebrow
+    val eyebrowMuted: TextStyle get() = current.eyebrowMuted
+    val serifDisplay: TextStyle get() = current.serifDisplay
+    val serifTitle: TextStyle get() = current.serifTitle
+    val serifSection: TextStyle get() = current.serifSection
+    val serifQuote: TextStyle get() = current.serifQuote
+    val body: TextStyle get() = current.body
+    val bodyMuted: TextStyle get() = current.bodyMuted
+    val label: TextStyle get() = current.label
+    val labelInk: TextStyle get() = current.labelInk
+    val smallLabel: TextStyle get() = current.smallLabel
 }
 
 @Composable
@@ -180,7 +233,7 @@ fun ScoreChip(score: Double, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(Color.White)
+            .background(HemColors.Surface)
             .padding(horizontal = 14.dp, vertical = 6.dp),
     ) {
         Text(
@@ -207,9 +260,11 @@ fun PrimaryButton(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp)
+            // heightIn, not height: at the Large text setting the label needs the room.
+            .heightIn(min = 56.dp)
             .clip(RoundedCornerShape(4.dp))
             .background(if (enabled) HemColors.Ink else HemColors.Muted)
+            .padding(vertical = 8.dp)
             .clickable(enabled = enabled) {
                 haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                 onClick()
@@ -233,16 +288,17 @@ fun OutlinedPill(
     leading: (@Composable () -> Unit)? = null,
     filled: Boolean = false,
 ) {
-    val bg = if (filled) Color.White else Color.Transparent
+    val bg = if (filled) HemColors.Surface else Color.Transparent
     val border = BorderStroke(1.dp, HemColors.Ink.copy(alpha = 0.55f))
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(52.dp)
+            .heightIn(min = 52.dp)
             .clip(RoundedCornerShape(999.dp))
             .background(bg)
             .border(border, RoundedCornerShape(999.dp))
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {

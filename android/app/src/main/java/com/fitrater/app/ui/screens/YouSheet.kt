@@ -71,7 +71,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-private val Red = Color(0xFFB23A2A)
+private val Red: Color get() = HemColors.Danger
 
 @Composable
 fun YouSheetContent(
@@ -167,10 +167,10 @@ fun YouSheetContent(
                 }
                 if (uploadingAvatar) {
                     Box(
-                        Modifier.fillMaxSize().clip(CircleShape).background(Color.Black.copy(alpha = 0.3f)),
+                        Modifier.fillMaxSize().clip(CircleShape).background(HemColors.Scrim.copy(alpha = 0.3f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("…", style = HemType.body.copy(color = Color.White))
+                        Text("…", style = HemType.body.copy(color = HemColors.OnScrim))
                     }
                 }
             }
@@ -693,7 +693,7 @@ fun CreditsSheetContent(onClose: () -> Unit, paywallContext: String? = null) {
                         .background(HemColors.Bronze)
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                 ) {
-                    Text("PRO", style = HemType.smallLabel.copy(color = Color.White, letterSpacing = 2.sp))
+                    Text("PRO", style = HemType.smallLabel.copy(color = HemColors.OnAccent, letterSpacing = 2.sp))
                 }
             }
         }
@@ -839,7 +839,7 @@ private fun PackCard(row: PackRow, busy: Boolean, enabled: Boolean, onClick: () 
                     ) {
                         Text(
                             "BEST VALUE",
-                            style = HemType.smallLabel.copy(color = Color.White, letterSpacing = 1.5.sp),
+                            style = HemType.smallLabel.copy(color = HemColors.OnAccent, letterSpacing = 1.5.sp),
                         )
                     }
                 }

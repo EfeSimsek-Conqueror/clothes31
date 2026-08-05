@@ -335,7 +335,7 @@ private fun ComboCard(combo: OutfitCombo, closet: List<ClosetItem>) {
                         .background(HemColors.Bronze)
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                 ) {
-                    Text("GAP", style = HemType.smallLabel.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color.White, letterSpacing = 1.5.sp))
+                    Text("GAP", style = HemType.smallLabel.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = HemColors.OnInk, letterSpacing = 1.5.sp))
                 }
             }
         }
@@ -420,7 +420,7 @@ private fun PrimaryBtn(text: String, enabled: Boolean, onClick: () -> Unit) {
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = HemType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White))
+        Text(text, style = HemType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = HemColors.OnInk))
     }
 }
 
