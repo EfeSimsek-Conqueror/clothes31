@@ -238,7 +238,7 @@ private fun AccordionRow(
                         Text(
                             "PRO",
                             style = HemType.smallLabel.copy(
-                                color = Color.White,
+                                color = HemColors.OnAccent,
                                 letterSpacing = 1.5.sp,
                                 fontSize = 10.sp,
                             ),

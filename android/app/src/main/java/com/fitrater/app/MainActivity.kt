@@ -1,11 +1,16 @@
 package com.fitrater.app
 
+import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,12 +22,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,9 +38,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -60,6 +71,8 @@ import com.fitrater.app.ui.screens.StudioCreateScreen
 import com.fitrater.app.ui.screens.StudioScreen
 import com.fitrater.app.ui.screens.YouSheetContent
 import com.fitrater.app.ui.theme.HemColors
+import com.fitrater.app.ui.theme.HemTheme
+import com.fitrater.app.util.AppPrefs
 import com.fitrater.app.util.ToastBus
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.handleDeeplinks
@@ -71,6 +84,29 @@ private const val PAGE_STUDIO = 1
 private const val PAGE_JOURNAL = 2
 
 class MainActivity : ComponentActivity() {
+    /**
+     * Apply the Text Size preference as a configuration override on the activity's
+     * context.
+     *
+     * Deliberately not a `LocalDensity` override at the Compose root: every
+     * `ModalBottomSheet` renders in its own window, and Compose re-provides
+     * `LocalDensity` from the platform there, so a root-level override silently skips
+     * all ~16 sheets. Overriding the configuration reaches every window the activity
+     * owns, and it multiplies with the user's OS-level font scale rather than replacing
+     * it. Changing the setting calls `recreate()` so this runs again.
+     */
+    override fun attachBaseContext(newBase: Context) {
+        AppPrefs.init(newBase)
+        val scale = AppPrefs.textScale.value.toFloat()
+        if (scale == 1f) {
+            super.attachBaseContext(newBase)
+            return
+        }
+        val config = Configuration(newBase.resources.configuration)
+        config.fontScale *= scale
+        super.attachBaseContext(newBase.createConfigurationContext(config))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Global uncaught exception logger — always log; always rethrow to preserve default behavior.
@@ -81,10 +117,22 @@ class MainActivity : ComponentActivity() {
             } catch (_: Throwable) { /* never crash the crasher */ }
             prev?.uncaughtException(thread, throwable)
         }
+        // Appearance prefs must be resolved before the first frame, otherwise a dark-mode
+        // user sees a flash of cream paper on every cold start. SharedPreferences reads
+        // are synchronous, so this is safe to do inline.
+        AppPrefs.init(this)
+        HemTheme.apply(AppPrefs.theme.value, systemDark = isSystemDark())
+        // The window is painted before Compose draws anything; without this a dark-theme
+        // user gets a flash of the platform's light windowBackground.
+        window.setBackgroundDrawable(ColorDrawable(HemColors.Paper.toArgb()))
         // Handle deep-link auth callback on cold start
         Supa.client.handleDeeplinks(intent)
         setContent { FitraterApp() }
     }
+
+    private fun isSystemDark(): Boolean =
+        resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+            Configuration.UI_MODE_NIGHT_YES
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -95,7 +143,34 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FitraterApp() {
-    MaterialTheme(colorScheme = lightColorScheme(background = HemColors.Paper, surface = HemColors.Paper)) {
+    val themePref by AppPrefs.theme.collectAsState()
+    val systemDark = isSystemInDarkTheme()
+
+    // Reconciliation. The palette is already correct on first frame (set in onCreate);
+    // this covers a live change from the Appearance picker and a system dark-mode flip.
+    LaunchedEffect(themePref, systemDark) { HemTheme.apply(themePref, systemDark) }
+    val isDark = HemColors.IsDark
+
+    // Match the system bars to the paper, and flip their icon tint with the theme —
+    // otherwise dark mode gets black status-bar icons on a near-black background.
+    val view = LocalView.current
+    SideEffect {
+        val window = (view.context as Activity).window
+        window.statusBarColor = HemColors.Paper.toArgb()
+        window.navigationBarColor = HemColors.Paper.toArgb()
+        WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = !isDark
+            isAppearanceLightNavigationBars = !isDark
+        }
+    }
+
+    val colorScheme = if (isDark) {
+        darkColorScheme(background = HemColors.Paper, surface = HemColors.Paper)
+    } else {
+        lightColorScheme(background = HemColors.Paper, surface = HemColors.Paper)
+    }
+
+    MaterialTheme(colorScheme = colorScheme) {
         Surface(color = HemColors.Paper) {
             val nav = rememberNavController()
             val backStack by nav.currentBackStackEntryAsState()
@@ -147,6 +222,12 @@ fun FitraterApp() {
                             com.fitrater.app.util.CreditsBus.refreshAsync()
                             val profile = runCatching { Repo.currentProfile() }.getOrNull()
                             RcBilling.setServerPro(profile?.is_pro == true)
+                            // Carry the user's appearance choice across devices/reinstalls.
+                            AppPrefs.hydrateFromProfile(
+                                profile?.theme,
+                                profile?.text_scale,
+                                profile?.reduce_motion,
+                            )
                             val target = if (profile?.onboarded == true) Route.Shell else Route.Onboard1
                             nav.navigate(target) {
                                 popUpTo(0) { inclusive = true }
@@ -185,7 +266,18 @@ fun FitraterApp() {
 
             Scaffold(
                 containerColor = HemColors.Paper,
-                snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+                snackbarHost = {
+                    SnackbarHost(hostState = snackbarHostState) { data ->
+                        // Material's default snackbar keeps its own scheme colours and
+                        // reads as off-brand lavender against the paper in both themes.
+                        Snackbar(
+                            snackbarData = data,
+                            containerColor = HemColors.Ink,
+                            contentColor = HemColors.OnInk,
+                            actionColor = HemColors.Bronze,
+                        )
+                    }
+                },
             ) { padding ->
                 Box(
                     Modifier

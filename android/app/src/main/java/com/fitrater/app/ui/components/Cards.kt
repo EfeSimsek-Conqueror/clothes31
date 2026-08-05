@@ -46,7 +46,7 @@ fun PhotoTile(
         contentAlignment = Alignment.Center,
     ) {
         if (label != null) {
-            Text(label, style = HemType.serifTitle.copy(color = Color.White))
+            Text(label, style = HemType.serifTitle.copy(color = HemColors.OnScrim))
         }
     }
 }

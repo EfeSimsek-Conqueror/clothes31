@@ -1,0 +1,12 @@
+<resources>
+    <!-- Applies when the SYSTEM is in dark mode. An explicit in-app Light/Dark choice is
+         applied at runtime in MainActivity (window background + insets controller), which
+         is what covers the case where the app theme disagrees with the system. -->
+    <style name="Theme.FitScoreHem" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/paper</item>
+        <item name="android:statusBarColor">#14120F</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">#14120F</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

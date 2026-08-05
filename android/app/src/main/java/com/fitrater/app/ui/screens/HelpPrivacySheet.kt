@@ -51,7 +51,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-private val Red = Color(0xFFB23A2A)
+private val Red: Color get() = HemColors.Danger
 
 @Composable
 fun HelpPrivacySheetContent(

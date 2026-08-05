@@ -218,7 +218,7 @@ fun StudioScreen(
         }
         Spacer(Modifier.height(HemSpace.lg))
         if (error != null) {
-            Text(error!!, style = HemType.bodyMuted.copy(color = Color(0xFFB0743A)))
+            Text(error!!, style = HemType.bodyMuted.copy(color = HemColors.Bronze))
             Spacer(Modifier.height(HemSpace.sm))
         }
         // The empty state already offers Import and Create as its own two cards — showing
@@ -332,7 +332,7 @@ private fun PieceCard(item: ClosetItem, imageUrl: String? = null, onClick: () ->
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                Text("👕", style = HemType.serifDisplay.copy(color = Color.White, fontSize = 48.sp))
+                Text("👕", style = HemType.serifDisplay.copy(color = HemColors.OnScrim, fontSize = 48.sp))
             }
         }
         Spacer(Modifier.height(HemSpace.xs))

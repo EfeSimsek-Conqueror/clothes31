@@ -226,7 +226,7 @@ fun DecodeScreen(
             } else {
                 if (error != null) {
                     Spacer(Modifier.height(HemSpace.sm))
-                    Text(error!!, style = HemType.bodyMuted.copy(color = Color(0xFFB0743A)))
+                    Text(error!!, style = HemType.bodyMuted.copy(color = HemColors.Bronze))
                 }
                 Spacer(Modifier.height(HemSpace.lg))
                 PrimaryButton(

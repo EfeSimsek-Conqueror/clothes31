@@ -110,11 +110,20 @@ fun SignInScreen(onAuthed: () -> Unit) {
                     Modifier
                         .size(20.dp)
                         .clip(CircleShape)
+                        // Google's mark keeps its own colours in both themes, so the
+                        // glyph on it must stay dark rather than following Ink.
                         .background(Color.White)
                         .border(1.dp, HemColors.Hairline, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("G", style = HemType.body.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp))
+                    Text(
+                        "G",
+                        style = HemType.body.copy(
+                            color = Color(0xFF141210),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                        ),
+                    )
                 }
             },
         )
@@ -132,7 +141,7 @@ fun SignInScreen(onAuthed: () -> Unit) {
             Spacer(Modifier.height(HemSpace.sm))
             Text(
                 error!!,
-                style = HemType.bodyMuted.copy(color = Color(0xFFB0743A), fontSize = 13.sp),
+                style = HemType.bodyMuted.copy(color = HemColors.Bronze, fontSize = 13.sp),
             )
         }
 
@@ -165,7 +174,7 @@ fun SignInScreen(onAuthed: () -> Unit) {
                             .fillMaxWidth()
                             .height(48.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color.White)
+                            .background(HemColors.Surface)
                             .border(1.dp, HemColors.Hairline, RoundedCornerShape(8.dp))
                             .padding(horizontal = 12.dp),
                         contentAlignment = Alignment.CenterStart,

@@ -311,7 +311,7 @@ fun MagazineCoverSheetContent(
                                     .clickable { mood = if (on) "" else m }
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
                             ) {
-                                Text(m, style = HemType.body.copy(fontSize = 13.sp, color = if (on) Color.White else HemColors.Ink))
+                                Text(m, style = HemType.body.copy(fontSize = 13.sp, color = if (on) HemColors.OnInk else HemColors.Ink))
                             }
                         }
                     }
@@ -376,7 +376,7 @@ fun MagazineCoverSheetContent(
                     ) {
                         Text(
                             if (busy) "Composing…" else "Compose · $cost",
-                            style = HemType.body.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White),
+                            style = HemType.body.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = HemColors.OnInk),
                         )
                     }
                 }
@@ -637,7 +637,7 @@ private fun MastheadEditorContent(current: String, onSave: (String) -> Unit, onC
                     .clickable(enabled = text.trim().isNotEmpty()) { onSave(text.trim().take(20)) },
                 contentAlignment = Alignment.Center,
             ) {
-                Text("Use this", style = HemType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White))
+                Text("Use this", style = HemType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = HemColors.OnInk))
             }
         }
         Spacer(Modifier.height(20.dp))
@@ -765,7 +765,7 @@ private fun EditCoverContent(
                             },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Add, contentDescription = "Add", tint = HemColors.OnInk, modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -780,7 +780,7 @@ private fun EditCoverContent(
                 .clickable(onClick = onCompose),
             contentAlignment = Alignment.Center,
         ) {
-            Text("Compose · $composeCostCredits credits", style = HemType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White))
+            Text("Compose · $composeCostCredits credits", style = HemType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = HemColors.OnInk))
         }
         Spacer(Modifier.height(8.dp))
         Text(

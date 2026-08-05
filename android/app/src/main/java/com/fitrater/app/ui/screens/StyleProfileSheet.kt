@@ -290,7 +290,7 @@ private fun RadioPill(label: String, selected: Boolean, onClick: () -> Unit, mod
         Text(
             label,
             style = HemType.body.copy(
-                color = if (selected) Color.White else HemColors.Ink,
+                color = if (selected) HemColors.OnInk else HemColors.Ink,
                 fontWeight = FontWeight.Medium,
                 fontSize = 14.sp,
             ),
@@ -311,7 +311,7 @@ private fun SimpleChip(label: String, active: Boolean, onClick: () -> Unit) {
         Text(
             label,
             style = HemType.body.copy(
-                color = if (active) Color.White else HemColors.Ink,
+                color = if (active) HemColors.OnInk else HemColors.Ink,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
             ),
@@ -344,7 +344,7 @@ private fun SwatchChip(swatch: Swatch, active: Boolean, onClick: () -> Unit) {
         Text(
             swatch.name,
             style = HemType.body.copy(
-                color = if (active) Color.White else HemColors.Ink,
+                color = if (active) HemColors.OnInk else HemColors.Ink,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
             ),

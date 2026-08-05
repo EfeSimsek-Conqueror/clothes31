@@ -55,23 +55,26 @@ fun HemBottomNav(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            left.forEach { NavCell(it, currentRoute == it.route) { onSelect(it.route) } }
+            left.forEach { NavCell(Modifier.weight(1f), it, currentRoute == it.route) { onSelect(it.route) } }
             CameraFab(onCameraClick)
-            right.forEach { NavCell(it, currentRoute == it.route) { onSelect(it.route) } }
+            right.forEach { NavCell(Modifier.weight(1f), it, currentRoute == it.route) { onSelect(it.route) } }
         }
     }
 }
 
 @Composable
-private fun NavCell(item: NavItem, active: Boolean, onClick: () -> Unit) {
+private fun NavCell(modifier: Modifier, item: NavItem, active: Boolean, onClick: () -> Unit) {
+    // Weighted rather than intrinsically sized: at the Large text setting the four
+    // labels outgrow the row and the last one ("YOU") used to clip off the edge.
     Column(
-        modifier = Modifier
+        modifier = modifier
             .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+            .padding(horizontal = 2.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             text = item.label.uppercase(),
+            maxLines = 1,
             style = HemType.smallLabel.copy(
                 color = if (active) HemColors.Ink else HemColors.Muted,
             ),
@@ -99,7 +102,7 @@ private fun CameraFab(onClick: () -> Unit) {
         Icon(
             imageVector = Icons.Default.PhotoCamera,
             contentDescription = "Score a look",
-            tint = Color.White,
+            tint = HemColors.OnInk,
             modifier = Modifier.size(26.dp),
         )
     }

@@ -333,7 +333,7 @@ private fun CalibrationTile(
                     .clickable(onClick = onClear),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.White, modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.Close, contentDescription = "Remove", tint = HemColors.OnInk, modifier = Modifier.size(14.dp))
             }
         } else {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -415,7 +415,7 @@ private fun PrimaryFullWidth(text: String, enabled: Boolean, onClick: () -> Unit
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = HemType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White))
+        Text(text, style = HemType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = HemColors.OnInk))
     }
 }
 

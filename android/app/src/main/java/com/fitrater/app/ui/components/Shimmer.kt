@@ -43,7 +43,7 @@ fun Modifier.shimmer(): Modifier {
         val brush = Brush.linearGradient(
             colors = listOf(
                 Color.Transparent,
-                Color.White.copy(alpha = 0.32f),
+                HemColors.OnScrim.copy(alpha = 0.32f),
                 Color.Transparent,
             ),
             start = Offset(startX, 0f),

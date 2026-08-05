@@ -198,7 +198,7 @@ fun RoastScreen(
                             Text(
                                 opt,
                                 style = HemType.body.copy(
-                                    color = if (selected) Color.White else HemColors.Ink,
+                                    color = if (selected) HemColors.OnInk else HemColors.Ink,
                                     fontSize = 13.sp,
                                 ),
                             )
@@ -208,7 +208,7 @@ fun RoastScreen(
 
                 if (error != null) {
                     Spacer(Modifier.height(HemSpace.sm))
-                    Text(error!!, style = HemType.bodyMuted.copy(color = Color(0xFFB0743A)))
+                    Text(error!!, style = HemType.bodyMuted.copy(color = HemColors.Bronze))
                 }
                 Spacer(Modifier.height(HemSpace.lg))
                 PrimaryButton(

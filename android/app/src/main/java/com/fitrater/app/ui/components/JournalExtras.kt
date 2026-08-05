@@ -41,7 +41,7 @@ import kotlin.math.abs
 // Kind pill (top-left of FitCard) — 10sp, tracked, uppercase, 4dp radius.
 // =============================================================================
 
-private val ROAST_RED = Color(0xFFB23A2A)
+private val ROAST_RED: Color get() = HemColors.Danger
 
 @Composable
 fun KindPill(kind: String?, modifier: Modifier = Modifier) {
@@ -61,7 +61,7 @@ fun KindPill(kind: String?, modifier: Modifier = Modifier) {
         Text(
             label,
             style = HemType.smallLabel.copy(
-                color = Color.White,
+                color = HemColors.OnAccent,
                 fontSize = 10.sp,
                 letterSpacing = 2.sp,
                 fontWeight = FontWeight.SemiBold,

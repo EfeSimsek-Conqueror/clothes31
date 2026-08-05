@@ -390,10 +390,10 @@ private fun AnnotationsOverlay(
         Canvas(Modifier.fillMaxSize()) {
             placed.forEach { p ->
                 val labelX = if (p.leftSide) with(density) { 6.dp.toPx() } else size.width - with(density) { 6.dp.toPx() }
-                val lineColor = Color.White.copy(alpha = 0.85f)
+                val lineColor = HemColors.OnScrim.copy(alpha = 0.85f)
                 val strokeW = with(density) { 1.2.dp.toPx() }
                 drawLine(
-                    color = Color.Black.copy(alpha = 0.35f),
+                    color = HemColors.Scrim.copy(alpha = 0.35f),
                     start = Offset(p.anchorX, p.anchorY),
                     end = Offset(labelX, p.labelY),
                     strokeWidth = strokeW + 1.4f,
@@ -407,12 +407,12 @@ private fun AnnotationsOverlay(
                 // Anchor dot
                 val dotR = with(density) { 4.dp.toPx() }
                 drawCircle(
-                    color = Color.Black.copy(alpha = 0.35f),
+                    color = HemColors.Scrim.copy(alpha = 0.35f),
                     radius = dotR + 1.2f,
                     center = Offset(p.anchorX, p.anchorY),
                 )
                 drawCircle(
-                    color = Color.White,
+                    color = HemColors.OnScrim,
                     radius = dotR,
                     center = Offset(p.anchorX, p.anchorY),
                 )
@@ -607,7 +607,7 @@ private fun androidx.compose.foundation.layout.BoxScope.LabelChip(
         Text(
             text,
             style = HemType.body.copy(
-                color = Color.White,
+                color = HemColors.OnScrim,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
             ),

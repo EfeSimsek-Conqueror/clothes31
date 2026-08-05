@@ -499,7 +499,7 @@ fun JournalScreen(onOpenDetail: (String) -> Unit = {}) {
                     .background(HemColors.Ink)
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             ) {
-                Text("Preparing…", style = HemType.body.copy(color = Color.White, fontSize = 12.sp))
+                Text("Preparing…", style = HemType.body.copy(color = HemColors.OnInk, fontSize = 12.sp))
             }
         }
     }
@@ -613,7 +613,7 @@ private fun CompareTopBar(count: Int, onCancel: () -> Unit) {
         Spacer(Modifier.weight(1f))
         Text(
             "Cancel",
-            style = HemType.body.copy(color = Color.White, fontWeight = FontWeight.Medium),
+            style = HemType.body.copy(color = HemColors.OnInk, fontWeight = FontWeight.Medium),
             modifier = Modifier.clickable { onCancel() },
         )
     }
@@ -731,7 +731,7 @@ private fun KindTabRow(active: KindTab, onSelect: (KindTab) -> Unit) {
                 Text(
                     label,
                     style = HemType.body.copy(
-                        color = if (sel) Color.White else HemColors.Ink,
+                        color = if (sel) HemColors.OnInk else HemColors.Ink,
                         fontSize = 13.sp,
                         fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal,
                     ),
@@ -776,7 +776,7 @@ private fun JournalChip(
         Text(
             label,
             style = HemType.body.copy(
-                color = if (selected) Color.White else HemColors.Ink,
+                color = if (selected) HemColors.OnInk else HemColors.Ink,
                 fontSize = 13.sp,
             ),
         )
@@ -785,7 +785,7 @@ private fun JournalChip(
             Text(
                 "×",
                 style = HemType.body.copy(
-                    color = if (selected) Color.White else HemColors.Ink,
+                    color = if (selected) HemColors.OnInk else HemColors.Ink,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                 ),
@@ -827,7 +827,7 @@ private fun ChipMultiSelectSheet(
                         Text(
                             label,
                             style = HemType.body.copy(
-                                color = if (sel) Color.White else HemColors.Ink,
+                                color = if (sel) HemColors.OnInk else HemColors.Ink,
                                 fontSize = 13.sp,
                             ),
                         )
@@ -915,8 +915,8 @@ private fun SubRow(label: String, a: Double?, b: Double?) {
         if (a != null && b != null) {
             val d = b - a
             val (glyph, color) = when {
-                d > 0 -> "▲" to Color(0xFF3E8A55)
-                d < 0 -> "▼" to Color(0xFFB0553A)
+                d > 0 -> "▲" to HemColors.Success
+                d < 0 -> "▼" to HemColors.Warning
                 else -> "·" to HemColors.Muted
             }
             Text(glyph, style = HemType.body.copy(color = color, fontSize = 12.sp))
@@ -1125,7 +1125,7 @@ private fun FitCard(
         if (kind != null && kind != "score" && kind != "user_scan") {
             val (label, color) = when (kind) {
                 "tryon" -> "TRY-ON" to HemColors.Bronze
-                "roast" -> "ROAST" to Color(0xFFB0553A)
+                "roast" -> "ROAST" to HemColors.Warning
                 "decode" -> "DECODED" to HemColors.Bronze
                 "studio_gen" -> "STUDIO" to HemColors.Bronze
                 else -> kind.uppercase() to HemColors.Bronze
@@ -1548,7 +1548,7 @@ private fun FacetsSheet(
                             Text(
                                 occ,
                                 style = HemType.body.copy(
-                                    color = if (sel) Color.White else HemColors.Ink,
+                                    color = if (sel) HemColors.OnInk else HemColors.Ink,
                                     fontSize = 13.sp,
                                 ),
                             )
@@ -1593,7 +1593,7 @@ private fun FacetsSheet(
                     Modifier
                         .size(16.dp)
                         .clip(RoundedCornerShape(999.dp))
-                        .background(Color.White),
+                        .background(HemColors.OnInk),
                 )
             }
         }
@@ -1623,7 +1623,7 @@ private fun FacetsSheet(
             ) {
                 Text(
                     "Apply ($previewCount results)",
-                    style = HemType.body.copy(color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
+                    style = HemType.body.copy(color = HemColors.OnInk, fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
                 )
             }
         }
