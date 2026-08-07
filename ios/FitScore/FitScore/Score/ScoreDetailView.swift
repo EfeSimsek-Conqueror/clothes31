@@ -15,6 +15,10 @@ struct ScoreDetailView: View {
     @State private var markupAnnotations: [MarkupAnnotation] = []
     @State private var fitMap: FitMap?
     @State private var showXRay = false
+    // Aug 2026: swipeable side view for Studio outfits (outfit_studio +
+    // outfit_studio_side sibling).
+    @State private var sideUrl: String? = nil
+    @State private var heroPagerIndex: Int = 0
 
     var body: some View {
         GeometryReader { geo in
@@ -50,21 +54,29 @@ struct ScoreDetailView: View {
 
     @ViewBuilder
     private func heroBlock(o: Outfit, height: CGFloat) -> some View {
+        let hasSide = sideUrl != nil
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 20)
                 .fill(Palette.card)
                 .frame(height: height)
                 .overlay(
                     Group {
-                        if let s = photoUrl, let u = URL(string: s) {
+                        if hasSide {
+                            // Studio outfit with a side view — swipeable pager.
+                            TabView(selection: $heroPagerIndex) {
+                                heroImage(url: photoUrl).tag(0)
+                                heroImage(url: sideUrl).tag(1)
+                            }
+                            .tabViewStyle(.page(indexDisplayMode: .never))
+                        } else if let s = photoUrl, let u = URL(string: s) {
                             AsyncImage(url: u) { $0.resizable().scaledToFill() } placeholder: { Color.clear }
                         }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                 )
                 .overlay(
-                    // Annotations overlay
-                    AnnotationsOverlay(annotations: o.annotations ?? [])
+                    // Annotations overlay (only meaningful for scored fits).
+                    AnnotationsOverlay(annotations: hasSide ? [] : (o.annotations ?? []))
                 )
 
             Button(action: onClose) {
@@ -78,12 +90,46 @@ struct ScoreDetailView: View {
             .padding(12)
         }
         .overlay(alignment: .topTrailing) {
-            if let s = o.score {
+            if let s = o.score, s > 0 {
                 ScoreChip(score: s).padding(12)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if hasSide {
+                HStack(spacing: 8) {
+                    pagerDot(active: heroPagerIndex == 0, label: "FRONT")
+                    pagerDot(active: heroPagerIndex == 1, label: "SIDE")
+                }
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(Palette.paper.opacity(0.9))
+                .clipShape(Capsule())
+                .padding(.bottom, 12)
             }
         }
         .padding(.horizontal, 20)
         .padding(.top, 16)
+    }
+
+    private func heroImage(url: String?) -> some View {
+        Group {
+            if let s = url, let u = URL(string: s) {
+                AsyncImage(url: u) { $0.resizable().scaledToFill() } placeholder: { Color.clear }
+            } else {
+                Color.clear
+            }
+        }
+    }
+
+    private func pagerDot(active: Bool, label: String) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(active ? Palette.ink : Palette.hairline)
+                .frame(width: 6, height: 6)
+            Text(label)
+                .font(.system(size: 9, weight: .semibold))
+                .tracking(1.5)
+                .foregroundStyle(active ? Palette.ink : Palette.muted)
+        }
     }
 
     @ViewBuilder
@@ -183,6 +229,13 @@ struct ScoreDetailView: View {
         outfit = try? await Repo.shared.outfitById(outfitId)
         if let p = outfit?.photo_path {
             photoUrl = try? await Repo.shared.signedOutfitUrl(p)
+        }
+        // If this is a Studio outfit, try to pick up the linked side view.
+        if outfit?.kind == "outfit_studio" {
+            if let side = try? await Repo.shared.linkedOutfit(linkedTo: outfitId, kind: "outfit_studio_side"),
+               let sp = side.photo_path {
+                sideUrl = try? await Repo.shared.signedOutfitUrl(sp)
+            }
         }
         average = try? await Repo.shared.averageScore()
         // Sprint 2 — pull the editorial markup + fit map for the "See the read" viewer.

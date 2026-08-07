@@ -2568,6 +2568,15 @@ struct OutfitWizardView: View {
             guard let p = piece, let id = item.id else { return }
             let url = closetStripUrls[id] ?? ""
             Haptic.tap()
+            // Tap again to unselect: if THIS exact item is already the prefill
+            // for that slot, remove both the prefill and the slot.
+            if alreadyPicked {
+                m.prefilled.removeValue(forKey: p)
+                if let idx = m.selection.firstIndex(of: p) {
+                    m.selection.remove(at: idx)
+                }
+                return
+            }
             if !m.selection.contains(p) {
                 if !RcBilling.shared.isPro && m.selection.count >= 2 {
                     showProUpsell = true
@@ -2645,6 +2654,7 @@ struct OutfitWizardView: View {
         Haptic.chip()
         if let idx = m.selection.firstIndex(of: piece) {
             m.selection.remove(at: idx)
+            m.prefilled.removeValue(forKey: piece)  // drop any closet prefill for this slot
             return
         }
         let isPro = RcBilling.shared.isPro

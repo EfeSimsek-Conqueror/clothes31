@@ -174,7 +174,10 @@ final class Repo {
             .order("created_at", ascending: false)
             .limit(limit)
             .execute()
-        return decodeOutfitsSafe(resp.data)
+        // Studio outfit side views are siblings of the front — hide them from
+        // the general list so the Journal doesn't show duplicates. They're
+        // fetched explicitly via `linkedOutfit(...)` when opening detail.
+        return decodeOutfitsSafe(resp.data).filter { $0.kind != "outfit_studio_side" }
     }
 
     func outfitById(_ id: String) async throws -> Outfit? {
@@ -182,6 +185,19 @@ final class Repo {
             .from("outfits")
             .select()
             .eq("id", value: id)
+            .limit(1)
+            .execute()
+        return decodeOutfitsSafe(resp.data).first
+    }
+
+    /// Find a sibling outfit linked to `id` (via linked_piece_id) with the given
+    /// `kind`. Used to fetch the SIDE view for a Studio outfit's front view.
+    func linkedOutfit(linkedTo id: String, kind: String) async throws -> Outfit? {
+        let resp = try await Supa.client
+            .from("outfits")
+            .select()
+            .eq("linked_piece_id", value: id)
+            .eq("kind", value: kind)
             .limit(1)
             .execute()
         return decodeOutfitsSafe(resp.data).first
