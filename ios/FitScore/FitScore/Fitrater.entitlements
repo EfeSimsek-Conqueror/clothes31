@@ -10,10 +10,9 @@
     <!-- Push notifications capability — used later for morning stylist / weekly wrapped. -->
     <key>aps-environment</key>
     <string>development</string>
-    <!-- Universal Links placeholder — subsequent agent will populate with the actual domain. -->
     <key>com.apple.developer.associated-domains</key>
     <array>
-        <string>applinks:fitrater.app</string>
+        <string>applinks:fitrater.ai</string>
     </array>
 </dict>
 </plist>

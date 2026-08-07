@@ -280,41 +280,33 @@ struct YouSheet: View {
     }
 
     private var rateRow: some View {
-        let alreadyRated = profile?.rated_ok == true
-        return Button {
-            guard !alreadyRated, !rateBusy else { return }
+        Button {
+            guard !rateBusy else { return }
             rateBusy = true
             if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
                 SKStoreReviewController.requestReview(in: scene)
             }
             Task {
-                try? await Repo.shared.addCredits(amount: Supa.playRatingReward, kind: "app_rating")
-                try? await Repo.shared.markRatedOk()
-                var p = profile ?? Profile()
-                p.rated_ok = true
-                profile = p
+                try? await Task.sleep(nanoseconds: 300_000_000)
                 rateBusy = false
-                toasts.post("\(Supa.playRatingReward) credits added — thanks.")
             }
         } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Rate on App Store")
                         .font(Serif.body(16, weight: .medium))
-                        .foregroundStyle(alreadyRated ? Palette.muted : Palette.ink)
-                    Text(alreadyRated ? "Thank you — you already rated." : (rateBusy ? "Opening…" : "Earn \(Supa.playRatingReward) credits — once."))
+                        .foregroundStyle(Palette.ink)
+                    Text(rateBusy ? "Opening…" : "One tap. It helps a lot.")
                         .font(Serif.body(13)).foregroundStyle(Palette.muted)
                 }
                 Spacer()
-                if !alreadyRated {
-                    Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(Palette.muted)
-                }
+                Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(Palette.muted)
             }
             .padding(.vertical, 14)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(alreadyRated || rateBusy)
+        .disabled(rateBusy)
     }
 
     private var signOutButton: some View {

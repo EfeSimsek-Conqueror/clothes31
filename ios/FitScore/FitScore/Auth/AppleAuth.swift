@@ -6,90 +6,51 @@ import Supabase
 /// Sign in with Apple → Supabase id-token bridge. This is the App Store's
 /// preferred / required OAuth flow when the app offers third-party sign-in,
 /// so it lives as first-class citizen alongside Google.
+///
+/// The SwiftUI `SignInWithAppleButton` owns the `ASAuthorizationController`
+/// lifecycle (presentation + delegate) — this class only vends the nonce and
+/// completes the Supabase exchange from the credential the button returns.
 @MainActor
-final class AppleAuth: NSObject, ObservableObject {
+final class AppleAuth: ObservableObject {
     /// Published error surface — the sign-in view can bind to this and show a
     /// toast without needing to manage the delegate handshake.
     @Published var lastError: String?
 
     private var currentNonce: String?
-    private var continuation: CheckedContinuation<Void, Error>?
 
-    /// Start the Apple sign-in flow. Returns when the user completes or cancels.
-    func signIn() async throws {
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            let nonce = AuthNonce.random()
-            currentNonce = nonce
-            continuation = cont
-
-            let provider = ASAuthorizationAppleIDProvider()
-            let request = provider.createRequest()
-            request.requestedScopes = [.fullName, .email]
-            request.nonce = AuthNonce.sha256(nonce)
-
-            let controller = ASAuthorizationController(authorizationRequests: [request])
-            controller.delegate = self
-            controller.presentationContextProvider = self
-            controller.performRequests()
-        }
+    /// Store the raw nonce the SwiftUI button's `onRequest` closure generated
+    /// so we can pass it to Supabase alongside the returned identity token.
+    func setNonce(_ nonce: String) {
+        currentNonce = nonce
     }
-}
 
-extension AppleAuth: ASAuthorizationControllerDelegate {
-    func authorizationController(
-        controller: ASAuthorizationController,
-        didCompleteWithAuthorization authorization: ASAuthorization
-    ) {
-        guard
-            let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-            let identityTokenData = credential.identityToken,
-            let idToken = String(data: identityTokenData, encoding: .utf8),
-            let nonce = currentNonce
-        else {
-            continuation?.resume(throwing: AuthError.noIdToken)
-            continuation = nil
-            return
-        }
-        let cont = continuation
-        continuation = nil
-        Task {
-            do {
-                try await Supa.client.auth.signInWithIdToken(
-                    credentials: OpenIDConnectCredentials(
-                        provider: .apple,
-                        idToken: idToken,
-                        nonce: nonce
-                    )
-                )
-                cont?.resume()
-            } catch {
-                cont?.resume(throwing: error)
+    /// Complete the Supabase exchange from the result the SwiftUI
+    /// `SignInWithAppleButton` handed us. Throws `AuthError.cancelled` when
+    /// the user tapped Cancel so callers can silently ignore it.
+    func handle(result: Result<ASAuthorization, Error>) async throws {
+        switch result {
+        case .failure(let error):
+            if let ae = error as? ASAuthorizationError, ae.code == .canceled {
+                throw AuthError.cancelled
             }
-        }
-    }
+            throw error
 
-    func authorizationController(
-        controller: ASAuthorizationController,
-        didCompleteWithError error: Error
-    ) {
-        let cont = continuation
-        continuation = nil
-        // The user tapping "Cancel" surfaces as an ASAuthorizationError.canceled.
-        if let ae = error as? ASAuthorizationError, ae.code == .canceled {
-            cont?.resume(throwing: AuthError.cancelled)
-        } else {
-            cont?.resume(throwing: error)
+        case .success(let authorization):
+            guard
+                let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                let identityTokenData = credential.identityToken,
+                let idToken = String(data: identityTokenData, encoding: .utf8),
+                let nonce = currentNonce
+            else {
+                throw AuthError.noIdToken
+            }
+            try await Supa.client.auth.signInWithIdToken(
+                credentials: OpenIDConnectCredentials(
+                    provider: .apple,
+                    idToken: idToken,
+                    nonce: nonce
+                )
+            )
         }
-    }
-}
-
-extension AppleAuth: ASAuthorizationControllerPresentationContextProviding {
-    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        // Grab the currently active foreground window — works on iOS 15+.
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap { $0.windows }
-            .first(where: { $0.isKeyWindow })
-            ?? ASPresentationAnchor()
     }
 }

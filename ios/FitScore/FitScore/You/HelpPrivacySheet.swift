@@ -41,12 +41,6 @@ struct HelpPrivacySheet: View {
                                 }
                             }
                             Hairline()
-                            ActionRow(title: "Rate on App Store", subtitle: "One tap. It helps a lot.") {
-                                if let url = URL(string: "https://apps.apple.com/app/id0000000000?action=write-review") {
-                                    UIApplication.shared.open(url)
-                                }
-                            }
-                            Hairline()
                         }
                     }
 

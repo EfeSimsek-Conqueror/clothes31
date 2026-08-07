@@ -14,6 +14,9 @@ struct SignInView: View {
     @State private var email = ""
     @State private var sending = false
     @State private var linkSent = false
+    @State private var password = ""
+    @State private var passwordSubmitting = false
+    @State private var showPasswordField = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -34,11 +37,16 @@ struct SignInView: View {
             VStack(spacing: 12) {
                 // Apple — required by App Store when offering other providers.
                 SignInWithAppleButton(.continue,
-                    onRequest: { _ in },
-                    onCompletion: { _ in
+                    onRequest: { request in
+                        let nonce = AuthNonce.random()
+                        apple.setNonce(nonce)
+                        request.requestedScopes = [.fullName, .email]
+                        request.nonce = AuthNonce.sha256(nonce)
+                    },
+                    onCompletion: { result in
                         Task {
-                            do { try await apple.signIn() }
-                            catch AuthError.cancelled { /* silent */ }
+                            do { try await apple.handle(result: result) }
+                            catch AuthError.cancelled { }
                             catch { toasts.post("Apple sign-in failed.") }
                         }
                     }
@@ -78,6 +86,29 @@ struct SignInView: View {
                     ) {
                         sendLink()
                     }
+
+                    // Password sign-in for demo accounts (App Store review) and
+                    // any user who set a password. Collapsed by default so the
+                    // primary magic-link path stays uncluttered.
+                    DisclosureGroup("Have a password?", isExpanded: $showPasswordField) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            SecureField("Password", text: $password)
+                                .textContentType(.password)
+                                .padding(14)
+                                .background(Palette.card)
+                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Palette.hairline, lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                            PrimaryButton(
+                                title: passwordSubmitting ? "Signing in…" : "Sign In",
+                                enabled: !passwordSubmitting && isEmailValid(email) && password.count >= 6
+                            ) {
+                                signInWithPassword()
+                            }
+                        }
+                        .padding(.top, 10)
+                    }
+                    .font(Serif.body(14))
+                    .foregroundStyle(Palette.muted)
                 }
             }
             .padding(.bottom, 32)
@@ -95,7 +126,24 @@ struct SignInView: View {
                 linkSent = true
                 toasts.post("Magic link sent to \(email).")
             } catch {
-                toasts.post("Couldn't send magic link.")
+                let msg = (error as? LocalizedError)?.errorDescription
+                          ?? String(String(describing: error).prefix(140))
+                toasts.post("Magic link failed: \(msg)")
+            }
+        }
+    }
+
+    private func signInWithPassword() {
+        passwordSubmitting = true
+        Task {
+            defer { passwordSubmitting = false }
+            do {
+                try await EmailAuth.signInWithPassword(email: email, password: password)
+                // SessionStore's authStateChanges listener will advance the stage.
+            } catch {
+                let msg = (error as? LocalizedError)?.errorDescription
+                          ?? String(String(describing: error).prefix(140))
+                toasts.post("Sign-in failed: \(msg)")
             }
         }
     }
