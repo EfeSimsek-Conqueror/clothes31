@@ -64,3 +64,4 @@ android/store/photos/*.png
 android/store/screenshots/raw/
 __pycache__/
 .claude/
+.vercel
