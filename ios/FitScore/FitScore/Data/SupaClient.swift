@@ -52,8 +52,6 @@ enum Supa {
     /// Free-trial abuse guard: annual sub in its 7-day intro period is capped
     /// to this many credits/day.
     static let trialDailyCap = 20
-    /// Play/App Store rating one-shot reward.
-    static let playRatingReward = 20
     /// Standard monthly sub credit cap (fair-use).
     static let subMonthlyCap = 1200
     /// Annual sub gives 3000/yr total (~250/mo) — enforced via monthly reset.
