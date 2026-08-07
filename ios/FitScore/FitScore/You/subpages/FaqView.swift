@@ -9,8 +9,8 @@ private let FAQS: [(String, String)] = [
      "Yes — from Settings → Apple ID → Subscriptions. Access continues until the current period ends and nothing rolls over. No penalty, no dark patterns."),
     ("How is my data used?",
      "Photos and prompts are processed by our AI providers to score and generate your looks. Nothing is used to train third-party models. Export or delete anytime under Help & privacy."),
-    ("What are Hem's honesty modes?",
-     "Kind reads gentler; Honest is the default; Brutal tells you when a look isn't landing. Pro members get Brutal on every scan."),
+    ("How does Hem talk to me?",
+     "One voice: honest and constructive. Real strengths, real weaknesses, always with a fix — never brutal, never sugar-coated."),
     ("How does Try-on work?",
      "Upload a photo of yourself plus a garment (or paste a link) and Hem renders it on you. Costs \(Supa.tryonCost) credits per try."),
 ]

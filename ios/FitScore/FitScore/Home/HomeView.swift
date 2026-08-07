@@ -108,6 +108,9 @@ struct HomeView: View {
     private var content: some View {
         LowCreditsBanner(onOpenCredits: { showCredits = true })
 
+        // Stylist chat invite — persistent top-of-feed entry point.
+        StylistHomeInviteBar(onTap: { CameraMenuBus.shared.request(.chat) })
+
         if let body = hemNoteBody, !body.isEmpty, !isFirstRun {
             HemMorningCard(body_: body)
         }

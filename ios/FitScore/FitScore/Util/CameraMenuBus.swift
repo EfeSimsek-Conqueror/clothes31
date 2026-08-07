@@ -6,6 +6,8 @@ enum CameraFlow: String, Identifiable {
     // Sprint 3 + 5 additions
     case cover       // manual magazine-cover composer
     case invitation  // decode a printed invite → 3 closet combos
+    // Stylist Chat (Aug 2026): moderate AI chat, replaces user-facing brutal roast entry.
+    case chat
     var id: String { rawValue }
 }
 

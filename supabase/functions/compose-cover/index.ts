@@ -1472,7 +1472,10 @@ Deno.serve(async (req: Request) => {
         }
         return "";
       })(),
-      upscaleSubject(FAL_KEY, source_image_url),
+      // v35 (Aug 2026): face upscaling / person "sharpening" removed per
+      // product decision — it altered subjects too much and users disliked
+      // the plasticky retouched look. Feed the original subject URL through.
+      Promise.resolve({ url: source_image_url, upscaled: false } as { url: string; upscaled: boolean; error?: string }),
     ]);
     const refBytesHash = refHashResult;
     const effectiveSubjectUrl = upscaleResult.url;
@@ -1529,6 +1532,23 @@ Deno.serve(async (req: Request) => {
     const renderedUrl = chain.url;
     let finalBytes = chain.bytes;
 
+    // v35 (Aug 2026): if the user typed a custom masthead in the compose sheet,
+    // ALWAYS overlay it verbatim on the final cover. Previously the reference
+    // cover's masthead survived the face-swap and the user's text was ignored,
+    // which felt broken ("I typed FITRATER but the cover still says REJ").
+    // We use overlayMinimalChrome which paints a masked band + text at the top.
+    const userMasthead = (body?.custom_masthead ? String(body.custom_masthead) : "")
+      || (body?.masthead ? String(body.masthead) : "");
+    let userMastheadOverlayApplied = false;
+    if (userMasthead && userMasthead.trim().length > 0) {
+      try {
+        finalBytes = await overlayMinimalChrome(finalBytes, sanitizeMasthead(userMasthead));
+        userMastheadOverlayApplied = true;
+      } catch (e) {
+        console.error("user_masthead_overlay_failed", String(e).slice(0, 200));
+      }
+    }
+
     // v24 Tier 2: verify chrome survived. If nano-banana stripped it, overlay
     // a minimal masthead + fitrater.ai as a safety net.
     let chromeStripped = false;
@@ -1536,7 +1556,8 @@ Deno.serve(async (req: Request) => {
     try {
       const chk = await checkChromePresent(FAL_KEY, renderedUrl);
       chromeStripped = !chk.has_text && !chk.has_masthead;
-      if (chromeStripped) {
+      // Skip the fallback if we already overlaid the user's masthead above.
+      if (chromeStripped && !userMastheadOverlayApplied) {
         try {
           const fallbackMasthead = sanitizeMasthead(
             body?.custom_masthead ? String(body.custom_masthead) : undefined,

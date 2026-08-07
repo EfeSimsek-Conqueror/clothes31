@@ -80,7 +80,7 @@ struct CreditsSheet: View {
         let (title, body): (String?, String?) = {
             switch paywallContext {
             case "tryon": return ("Try-on is Pro.", "Wear any Studio piece on your own photo. Unlimited on Pro.")
-            case "brutal": return ("Brutal mode is Pro.", "Turn Hem's kid gloves off. Brutal, honest, one-line verdicts.")
+            case "brutal": return (nil, nil)  // Brutal mode removed Aug 2026 — case kept for enum stability, no hero shown.
             case "letter": return ("The Sunday Letter is Pro.", "A short Sunday letter — what you wore, what worked, what to try.")
             default: return (nil, nil)
             }

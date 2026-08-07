@@ -83,15 +83,11 @@ struct StudioView: View {
             loaded = true
         }
         .fullScreenCover(isPresented: $showCreate) {
-            StudioCreateView(
-                editingPieceId: nil,
-                presetType: nil,
-                presetReferenceUrl: nil,
-                onDone: {
-                    showCreate = false
-                    Task { await refresh() }
-                }
-            )
+            // Studio 2.0 gateway (Aug 2026): picks single-piece vs outfit wizard.
+            StudioCreateGateway(onDone: {
+                showCreate = false
+                Task { await refresh() }
+            })
         }
         .fullScreenCover(isPresented: $showCoverComposer) {
             MagazineCoverSheet(outfitId: nil, onClose: { showCoverComposer = false })

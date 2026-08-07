@@ -49,6 +49,30 @@ enum Supa {
     static let frontBackExtraCost = 2        // added on top of scoreCost for dual shot
     static let magazineCoverThreshold = 8.5  // auto-trigger cover if score ≥ this
 
+    // MARK: - Studio 2.0 pricing (Aug 2026) — sequential outfit wizard
+    // singlePieceCost supersedes generateCost (15) for Studio single-piece flow.
+    // Outfits are bundle-priced with a Pro gate above 2 pieces.
+    static let singlePieceCost = 10
+    static let outfitTwoCost = 18
+    static let outfitThreeCost = 24
+    static let outfitFourCost = 32
+    static let outfitExtraPieceCost = 8              // per piece beyond 4
+    static let extraAlternativesCost = 5             // "3 yeni alternatif" reroll
+    static let singleAlternativeRegenCost = 2        // per-alternative regen
+    static let studioCombineStandaloneCost = 6       // outfit combine at end
+
+    /// Convenience: total credits for an N-piece outfit generation (each piece
+    /// yields 3 alternatives). Rejects/regens/combine are billed on top.
+    static func outfitCost(pieceCount n: Int) -> Int {
+        switch n {
+        case ...1: return singlePieceCost
+        case 2: return outfitTwoCost
+        case 3: return outfitThreeCost
+        case 4: return outfitFourCost
+        default: return outfitFourCost + (n - 4) * outfitExtraPieceCost
+        }
+    }
+
     /// Free-trial abuse guard: annual sub in its 7-day intro period is capped
     /// to this many credits/day.
     static let trialDailyCap = 20

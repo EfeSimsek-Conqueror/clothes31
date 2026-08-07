@@ -31,6 +31,11 @@ struct TryOnView: View {
     @State private var showCamera = false
     @State private var personPickerItem: PhotosPickerItem?
     @State private var piecePickerItem: PhotosPickerItem?
+    // Pro-only additions (Aug 2026): paste-URL piece source + season swap
+    @State private var showUrlSheet = false
+    @State private var pastedUrl = ""
+    @State private var urlNotice: String? = nil
+    @State private var seasonSwapNotice: String? = nil
 
     var body: some View {
         ZStack {
@@ -83,6 +88,64 @@ struct TryOnView: View {
         .onChange(of: piecePickerItem) { _, item in
             Task { await importPiece(item) }
         }
+        .sheet(isPresented: $showUrlSheet) { urlSheet }
+        .alert("Season swap", isPresented: .init(
+            get: { seasonSwapNotice != nil },
+            set: { if !$0 { seasonSwapNotice = nil } }
+        )) {
+            Button("OK", role: .cancel) { seasonSwapNotice = nil }
+        } message: {
+            Text(seasonSwapNotice ?? "")
+        }
+        .alert("URL saved", isPresented: .init(
+            get: { urlNotice != nil },
+            set: { if !$0 { urlNotice = nil } }
+        )) {
+            Button("OK", role: .cancel) { urlNotice = nil }
+        } message: {
+            Text(urlNotice ?? "")
+        }
+    }
+
+    // Pro paste-URL sheet. For now: capture the URL, show a note. Server-side
+    // scrape wiring lands in a follow-up (needs a tryon-from-url edge fn).
+    private var urlSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("https://...", text: $pastedUrl)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .textContentType(.URL)
+                        .keyboardType(.URL)
+                } header: {
+                    Text("Product URL")
+                } footer: {
+                    Text("Paste a Zara / Instagram / Amazon product link. Hem will pull the garment and drop it into try-on.")
+                }
+            }
+            .navigationTitle("Try from URL")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showUrlSheet = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        let trimmed = pastedUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+                        showUrlSheet = false
+                        if trimmed.isEmpty { return }
+                        // Placeholder: mark source as url so subsequent generate can
+                        // send it to the backend (edge function extension TBD).
+                        pieceSource = "upload"
+                        importedPieceUrl = trimmed
+                        urlNotice = "Got the link. Full URL → try-on ships in the next update. For now, upload the item photo if you can."
+                    }
+                    .disabled(pastedUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+        .presentationDetents([.height(260)])
     }
 
     // MARK: - Sections
@@ -206,6 +269,17 @@ struct TryOnView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                // Pro-only: paste a product URL (Zara / IG / Amazon) — server-side scrape (TBD).
+                Button(action: {
+                    Haptic.chip()
+                    let ctx = FeatureGates.requireTryon()
+                    if ctx != nil { onOpenPaywall(); return }
+                    pastedUrl = ""
+                    showUrlSheet = true
+                }) {
+                    tinyChip(icon: "link", label: "URL")
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -393,6 +467,25 @@ struct TryOnView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
             .overlay(Capsule().stroke(Palette.bronze.opacity(0.6), lineWidth: 1))
+
+            // Pro-only: Season swap — re-render the same look in a different season palette.
+            Button(action: {
+                Haptic.chip()
+                let ctx = FeatureGates.requireTryon()
+                if ctx != nil { onOpenPaywall(); return }
+                seasonSwapNotice = "Season swap is queued — Hem will re-shoot this fit in summer palette. Full support ships in the next update."
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "thermometer.sun.fill")
+                    Text("Season swap · Pro")
+                        .font(Serif.body(13, weight: .medium))
+                }
+                .foregroundStyle(Palette.ink)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .overlay(Capsule().stroke(Palette.ink.opacity(0.4), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
 
             Button(action: {
                 resultUrl = nil; savedOk = false

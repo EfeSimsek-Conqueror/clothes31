@@ -48,9 +48,8 @@ private struct NotProContent: View {
         "i.  Unlimited scoring",
         "ii.  Studio without cap",
         "iii.  Try-on priority",
-        "iv.  Brutal mode always",
-        "v.  Monthly Sunday letters",
-        "vi.  Full Hem memory",
+        "iv.  Monthly Sunday letters",
+        "v.  Full Hem memory",
     ]
     var body: some View {
         Text("Unlimited scoring, deeper Studio, Hem's full memory.")

@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import Supabase
 
 /// Bottom tab bar shell with a floating center camera FAB. The camera slot is
 /// NOT a nav destination — tapping it opens the `CameraMenuSheet`.
@@ -76,6 +78,8 @@ struct MainTabView: View {
             case .invitation:
                 InvitationDecoderView(onClose: { cameraBus.pending = nil },
                                       onOpenPaywall: { cameraBus.request(.paywall, context: nil) })
+            case .chat:
+                StylistChatView(onClose: { cameraBus.pending = nil })
             case .paywall:
                 CreditsSheet(onClose: { cameraBus.pending = nil },
                              paywallContext: cameraBus.paywallContext?.rawValue)
@@ -133,5 +137,366 @@ private struct TabBar: View {
         }
         .frame(maxWidth: .infinity)
         .offset(y: -8)
+    }
+}
+
+// MARK: - Stylist Chat (Aug 2026)
+// Kept in this file to avoid Xcode pbxproj edits. Split into own files later.
+
+/// A single line in the chat transcript.
+struct StylistMessage: Identifiable, Equatable {
+    enum Role: String { case user, assistant, system }
+    let id = UUID()
+    let role: Role
+    var text: String
+    /// Local image previews (base64 not persisted). For user messages.
+    var image: UIImage? = nil
+    var isStreaming: Bool = false
+    var chips: [ChatChip] = []
+}
+
+enum ChatChip: String, Identifiable, CaseIterable {
+    case tryon = "🪞 Try it on"
+    case alternates = "🔁 3 alternatives"
+    case save = "📌 Save this"
+    var id: String { rawValue }
+}
+
+@MainActor
+final class StylistChatViewModel: ObservableObject {
+    @Published var messages: [StylistMessage] = []
+    @Published var input: String = ""
+    @Published var pickedImage: UIImage? = nil
+    @Published var pickedImageData: Data? = nil
+    @Published var busy: Bool = false
+    @Published var error: String? = nil
+
+    init() {
+        // Warm opener — moderate tone, sets expectations.
+        messages.append(StylistMessage(
+            role: .assistant,
+            text: "Hey — I'm Hem. Send a fit photo or ask about tonight's look. I'll be honest and constructive."
+        ))
+    }
+
+    func send() async {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty || pickedImage != nil else { return }
+        let userMsg = StylistMessage(role: .user, text: trimmed, image: pickedImage)
+        messages.append(userMsg)
+        let imageData = pickedImageData
+        input = ""
+        pickedImage = nil
+        pickedImageData = nil
+        busy = true
+        error = nil
+
+        // Placeholder assistant message we'll fill in.
+        var placeholder = StylistMessage(role: .assistant, text: "", isStreaming: true)
+        messages.append(placeholder)
+        let placeholderId = placeholder.id
+
+        do {
+            let history: [StylistApi.Msg] = messages
+                .dropLast() // drop the streaming placeholder
+                .suffix(20)
+                .map { StylistApi.Msg(role: $0.role.rawValue, content: $0.text) }
+            let reply = try await StylistApi.send(history: history, imageData: imageData)
+            if let idx = messages.firstIndex(where: { $0.id == placeholderId }) {
+                messages[idx].text = reply
+                messages[idx].isStreaming = false
+                // Auto-add helpful chips for outfit-related answers.
+                messages[idx].chips = deriveChips(for: reply)
+            }
+        } catch {
+            let msg = "Couldn't reach Hem right now. \(error.localizedDescription)"
+            if let idx = messages.firstIndex(where: { $0.id == placeholderId }) {
+                messages[idx].text = msg
+                messages[idx].isStreaming = false
+            }
+            self.error = msg
+        }
+        busy = false
+    }
+
+    private func deriveChips(for reply: String) -> [ChatChip] {
+        let lower = reply.lowercased()
+        var chips: [ChatChip] = []
+        if lower.contains("try") || lower.contains("wear") || lower.contains("pair") || lower.contains("swap") {
+            chips.append(.tryon)
+            chips.append(.alternates)
+        }
+        chips.append(.save)
+        return chips
+    }
+}
+
+/// Thin service around the `stylist-chat` edge function. Falls back to a canned
+/// reply when the function is missing (dev), so the UI is testable end-to-end
+/// without the backend deployed yet.
+enum StylistApi {
+    struct Msg: Codable { let role: String; let content: String }
+    struct Payload: Encodable {
+        let messages: [Msg]
+        let image_base64: String?
+    }
+    struct Reply: Decodable { let text: String? ; let error: String? }
+
+    static func send(history: [Msg], imageData: Data?) async throws -> String {
+        let payload = Payload(
+            messages: history,
+            image_base64: imageData?.base64EncodedString()
+        )
+        do {
+            let r: Reply = try await Supa.client.functions.invoke(
+                "stylist-chat",
+                options: FunctionInvokeOptions(body: payload)
+            )
+            if let text = r.text, !text.isEmpty { return text }
+            if let err = r.error { throw NSError(domain: "stylist-chat", code: 1, userInfo: [NSLocalizedDescriptionKey: err]) }
+            throw NSError(domain: "stylist-chat", code: 2, userInfo: [NSLocalizedDescriptionKey: "empty reply"])
+        } catch {
+            // Fallback so the UI works before the edge function is deployed.
+            let last = history.last?.content ?? ""
+            return canned(for: last)
+        }
+    }
+
+    private static func canned(for prompt: String) -> String {
+        let p = prompt.lowercased()
+        if p.contains("wedding") || p.contains("düğün") {
+            return "For a wedding: linen suit if it's daytime, wool if evening. Keep shoes brown-leather, tie optional. Send a mirror shot when you've got the base on and I'll refine."
+        }
+        if p.isEmpty {
+            return "Nice — I'll take a look. Anything specific: fit, colour, or occasion?"
+        }
+        return "Got you. Send a photo of what you're considering and I'll call the proportions and colour honestly."
+    }
+}
+
+/// Chat screen — presented as fullScreenCover from CameraMenuBus.request(.chat).
+struct StylistChatView: View {
+    var onClose: () -> Void
+
+    @StateObject private var vm = StylistChatViewModel()
+    @State private var pickerItem: PhotosPickerItem? = nil
+    @FocusState private var inputFocused: Bool
+
+    var body: some View {
+        ZStack {
+            Palette.paper.ignoresSafeArea()
+            VStack(spacing: 0) {
+                header
+                Hairline()
+                transcript
+                Hairline()
+                composer
+            }
+        }
+        .onChange(of: pickerItem) { _, item in
+            Task {
+                if let item, let data = try? await item.loadTransferable(type: Data.self) {
+                    let processed = CameraModel.processJpeg(data) ?? data
+                    vm.pickedImageData = processed
+                    vm.pickedImage = UIImage(data: processed)
+                }
+            }
+        }
+    }
+
+    // MARK: header
+
+    private var header: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("STYLIST")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(2)
+                    .foregroundStyle(Palette.bronze)
+                Text("Chat with Hem")
+                    .font(Serif.display(22))
+                    .foregroundStyle(Palette.ink)
+            }
+            Spacer()
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .foregroundStyle(Palette.ink)
+                    .frame(width: 36, height: 36)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
+    }
+
+    // MARK: transcript
+
+    private var transcript: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    ForEach(vm.messages) { msg in
+                        MessageBubble(msg: msg)
+                            .id(msg.id)
+                    }
+                    if vm.busy {
+                        HStack(spacing: 6) {
+                            ForEach(0..<3, id: \.self) { i in
+                                Circle().fill(Palette.muted).frame(width: 5, height: 5)
+                                    .opacity(0.6)
+                            }
+                        }
+                        .padding(.leading, 20)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 16)
+            }
+            .onChange(of: vm.messages.count) { _, _ in
+                if let last = vm.messages.last {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo(last.id, anchor: .bottom)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: composer
+
+    private var composer: some View {
+        VStack(spacing: 8) {
+            if let img = vm.pickedImage {
+                HStack {
+                    ZStack(alignment: .topTrailing) {
+                        Image(uiImage: img)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 64, height: 64)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        Button(action: {
+                            vm.pickedImage = nil
+                            vm.pickedImageData = nil
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.white, .black.opacity(0.6))
+                                .font(.system(size: 18))
+                                .padding(2)
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+            }
+            HStack(spacing: 10) {
+                PhotosPicker(selection: $pickerItem, matching: .images) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Palette.ink)
+                        .frame(width: 36, height: 36)
+                }
+                TextField("Ask Hem — a fit, an occasion, a swap…", text: $vm.input, axis: .vertical)
+                    .lineLimit(1...4)
+                    .focused($inputFocused)
+                    .font(Serif.body(15))
+                    .foregroundStyle(Palette.ink)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(Palette.card)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Palette.hairline, lineWidth: 1))
+                Button(action: {
+                    Haptic.tap()
+                    Task { await vm.send() }
+                }) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 30))
+                        .foregroundStyle(canSend ? Palette.ink : Palette.muted)
+                }
+                .disabled(!canSend || vm.busy)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .padding(.bottom, 12)
+        }
+        .background(Palette.paper)
+    }
+
+    private var canSend: Bool {
+        !vm.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || vm.pickedImage != nil
+    }
+}
+
+private struct MessageBubble: View {
+    let msg: StylistMessage
+
+    var body: some View {
+        HStack(alignment: .top) {
+            if msg.role == .user { Spacer(minLength: 40) }
+            VStack(alignment: msg.role == .user ? .trailing : .leading, spacing: 6) {
+                if let img = msg.image {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: 200, maxHeight: 240)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                if !msg.text.isEmpty || msg.isStreaming {
+                    Text(msg.isStreaming && msg.text.isEmpty ? "…" : msg.text)
+                        .font(Serif.body(15))
+                        .foregroundStyle(msg.role == .user ? .white : Palette.ink)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(msg.role == .user ? Palette.ink : Palette.card)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                if msg.role == .assistant, !msg.chips.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(msg.chips) { chip in
+                            Text(chip.rawValue)
+                                .font(.system(size: 11, weight: .semibold))
+                                .tracking(0.5)
+                                .foregroundStyle(Palette.ink)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Palette.card)
+                                .overlay(Capsule().stroke(Palette.hairline, lineWidth: 1))
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+            }
+            if msg.role == .assistant { Spacer(minLength: 40) }
+        }
+    }
+}
+
+/// Compact banner shown at the top of Home to invite chat entry.
+struct StylistHomeInviteBar: View {
+    var onTap: () -> Void
+    var body: some View {
+        Button(action: {
+            Haptic.chip()
+            onTap()
+        }) {
+            HStack(spacing: 10) {
+                Image(systemName: "bubble.left.and.bubble.right.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Palette.bronze)
+                Text("Ask your stylist…")
+                    .font(Serif.body(14))
+                    .foregroundStyle(Palette.muted)
+                Spacer()
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Palette.bronze)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Palette.card)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Palette.hairline, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 }

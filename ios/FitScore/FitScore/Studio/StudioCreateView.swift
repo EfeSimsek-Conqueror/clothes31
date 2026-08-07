@@ -22,6 +22,43 @@ private let SLEEVE = ["Sleeveless", "Short", "3/4", "Long", "Extra-long"]
 private let BOTTOM_LENGTH = ["Micro", "Short", "Above-knee", "Below-knee", "Ankle", "Full", "Puddle"]
 private let DRESS_LENGTH = ["Mini", "Above-knee", "Midi", "Below-knee", "Ankle", "Maxi"]
 
+// Subtype-specific option pools (Aug 2026)
+private let NECKLINES = ["Crew", "V-neck", "Scoop", "Boat", "Square", "Henley", "Sweetheart", "Off-shoulder", "Halter", "Turtle"]
+private let HOODIE_CLOSURES = ["Pullover", "Zip-up", "Half-zip"]
+private let HOODIE_DRAWSTRING = ["With drawstring", "No drawstring"]
+private let CARDIGAN_CLOSURES = ["Buttoned", "Open-front", "Zip", "Belted"]
+private let BLAZER_LAPELS = ["Notch", "Peak", "Shawl", "Collarless"]
+private let BLAZER_BUTTONS = ["1-button", "2-button", "3-button", "Double-breasted"]
+private let SHIRT_COLLARS = ["Point", "Spread", "Button-down", "Cuban", "Band", "Mandarin"]
+private let WAIST_RISES = ["Low", "Mid", "High"]
+private let PANT_FITS = ["Skinny", "Slim", "Straight", "Wide", "Bootcut", "Flared", "Baggy"]
+
+/// Which subtypes get a Neckline question after Sleeve/Length.
+private func subtypeUsesNeckline(_ subtype: String?) -> Bool {
+    guard let s = subtype else { return false }
+    return ["T-shirt", "Tank", "Polo", "Turtleneck",
+            "Mini", "Midi", "Maxi", "Slip", "Wrap", "Shirt-dress"].contains(s)
+}
+/// Constrain neckline options per subtype.
+private func necklineOptionsFor(_ subtype: String?) -> [String] {
+    switch subtype {
+    case "Tank": return ["Scoop", "V-neck", "Square", "Halter", "Racerback"]
+    case "Polo": return ["Polo collar"]  // effectively fixed but shown for clarity
+    case "Turtleneck": return ["Turtle", "Mock-neck"]
+    case "T-shirt": return ["Crew", "V-neck", "Scoop", "Boat", "Henley"]
+    default: return NECKLINES
+    }
+}
+private func subtypeIsHoodie(_ subtype: String?) -> Bool { subtype == "Hoodie" }
+private func subtypeIsCardigan(_ subtype: String?) -> Bool { subtype == "Cardigan" }
+private func subtypeIsBlazer(_ subtype: String?) -> Bool { subtype == "Blazer" }
+private func subtypeIsShirt(_ subtype: String?) -> Bool { subtype == "Shirt" }
+/// Pants-like bottoms that support waist rise + fit shape.
+private func subtypeIsPantsLike(_ subtype: String?) -> Bool {
+    guard let s = subtype else { return false }
+    return ["Trousers", "Jeans", "Chinos", "Cargo"].contains(s)
+}
+
 private let DETAILS_DEFAULT = [
     "Pocket", "Hood", "Zip", "Buttons", "Embroidery", "Print", "Distress", "Patchwork",
     "Drawstring", "Contrast piping", "Ribbed", "Quilted", "Fringe", "Lace", "Mesh", "Panel-blocking",
@@ -153,6 +190,16 @@ final class WizardState {
     var bagSize: String? = nil
     var strap: String? = nil
     var hardware: String? = nil
+    // Subtype-specific (Aug 2026)
+    var neckline: String? = nil
+    var hoodieClosure: String? = nil
+    var hoodieDrawstring: String? = nil
+    var cardiganClosure: String? = nil
+    var blazerLapel: String? = nil
+    var blazerButtons: String? = nil
+    var shirtCollar: String? = nil
+    var waistRise: String? = nil
+    var pantFit: String? = nil
 }
 
 private struct WizardSnapshot {
@@ -179,6 +226,15 @@ private struct WizardSnapshot {
     let bagSize: String?
     let strap: String?
     let hardware: String?
+    let neckline: String?
+    let hoodieClosure: String?
+    let hoodieDrawstring: String?
+    let cardiganClosure: String?
+    let blazerLapel: String?
+    let blazerButtons: String?
+    let shirtCollar: String?
+    let waistRise: String?
+    let pantFit: String?
 }
 
 private extension WizardState {
@@ -190,7 +246,11 @@ private extension WizardState {
             freeText: freeText, referenceUrl: referenceUrl,
             mannequinGender: mannequin, prefFabrics: prefFabrics, prefColors: prefColors,
             sole: sole, toe: toe, shoeHeight: shoeHeight, closureType: closureType,
-            bagType: bagType, bagSize: bagSize, strap: strap, hardware: hardware
+            bagType: bagType, bagSize: bagSize, strap: strap, hardware: hardware,
+            neckline: neckline, hoodieClosure: hoodieClosure,
+            hoodieDrawstring: hoodieDrawstring, cardiganClosure: cardiganClosure,
+            blazerLapel: blazerLapel, blazerButtons: blazerButtons,
+            shirtCollar: shirtCollar, waistRise: waistRise, pantFit: pantFit
         )
     }
 }
@@ -258,10 +318,41 @@ private func renderPrompt(_ s: WizardSnapshot) -> String {
                 "sharp material and hardware detail, editorial catalog aesthetic.\(trailing)\(prefHint)"
         }
     default:
-        return "Editorial fashion photograph of a \(silhouettePart) \(subtypeToken) in \(colorPart) tones, " +
-            "\(fabricPart)\(texturePart)\(detailsPart)\(lenPart), for \(occasion) \(season) wear — " +
-            "worn on a minimalist headless matte-white \(s.mannequinGender)-form mannequin against a clean cream studio backdrop, " +
-            "front-facing, magazine editorial styling, natural studio lighting, sharp fabric detail.\(trailing)\(prefHint)"
+        // Aug 2026 (v3): reverted from "young stylish model" to the classic
+        // Studio look — isolated piece on a headless mannequin. The live-model
+        // render was pulling in accompanying garments (t-shirt under a cardigan,
+        // jean shorts under a top) which is wrong for a single-piece catalog.
+        // Combining happens later, when all pieces are ready. Each piece must
+        // ship SOLO so it can be composited cleanly.
+        var subtypeBits: [String] = []
+        if let nk = s.neckline { subtypeBits.append("\(nk.lowercased()) neckline") }
+        if let hc = s.hoodieClosure { subtypeBits.append(hc.lowercased()) }
+        if let hd = s.hoodieDrawstring, hd.lowercased().hasPrefix("with") { subtypeBits.append("with drawstring") }
+        if let cc = s.cardiganClosure { subtypeBits.append("\(cc.lowercased()) front") }
+        if let bl = s.blazerLapel { subtypeBits.append("\(bl.lowercased()) lapel") }
+        if let bb = s.blazerButtons { subtypeBits.append(bb.lowercased()) }
+        if let sc = s.shirtCollar { subtypeBits.append("\(sc.lowercased()) collar") }
+        if let pf = s.pantFit { subtypeBits.append("\(pf.lowercased()) leg") }
+        if let wr = s.waistRise { subtypeBits.append("\(wr.lowercased())-rise waist") }
+        let subtypePart = subtypeBits.isEmpty ? "" : ", " + subtypeBits.joined(separator: ", ")
+
+        // Bottoms + dresses drape naturally on a form; tops need to hang from
+        // shoulders. Either way: NO other garments, NO layered clothing.
+        // Aug 2026 v4: force FULL-BODY headless mannequin with arms visible —
+        // Fal was returning half-body / no-arm renders which broke combining.
+        let bodyForm = """
+        worn on the standard Fitrater mannequin: a headless matte-white \(s.mannequinGender)-form MANNEQUIN, \
+        FULL BODY visible from shoulders to feet, arms at sides, standing upright, front-facing, \
+        against a clean cream studio backdrop
+        """
+
+        return "Studio product photograph of a \(silhouettePart) \(subtypeToken)\(subtypePart) in \(colorPart) tones, " +
+            "\(fabricPart)\(texturePart)\(detailsPart)\(lenPart), for \(occasion) \(season) wear, " +
+            "\(bodyForm). " +
+            "The MANNEQUIN MUST show: full body, both arms attached and visible, no cropping at the arms or waist. " +
+            "ONLY the \(subtypeToken) is visible on the mannequin — NO t-shirt underneath, NO trousers, NO shorts, NO shoes, " +
+            "NO accompanying clothing, NO layered garments. Bare mannequin surface everywhere else. " +
+            "Soft diffused studio lighting, sharp fabric and stitching detail, editorial catalog aesthetic.\(trailing)\(prefHint)"
     }
 }
 
@@ -333,7 +424,21 @@ private func applicableSteps(type: String?, subtype: String?) -> [Int] {
         }
         return [1, 4, 5, 6, 7, 8, 9]
     default:
-        return Array(1...9)
+        // Base flow for tops / bottoms / outerwear / dresses:
+        // 1 type+ref → 2 silhouette → 3 sleeve/length → [subtype-specifics] →
+        // 4 details → 5 colors → 6 fabric → 7 occasion → 8 refinements → 9 preview.
+        var out: [Int] = [1, 2, 3]
+
+        // Subtype-specifics — inject before Details.
+        if subtypeUsesNeckline(subtype)   { out.append(20) }  // Neckline
+        if subtypeIsHoodie(subtype)       { out.append(contentsOf: [21, 22]) }  // Closure + Drawstring
+        if subtypeIsCardigan(subtype)     { out.append(23) }  // Cardigan closure
+        if subtypeIsBlazer(subtype)       { out.append(contentsOf: [24, 25]) }  // Lapel + Buttons
+        if subtypeIsShirt(subtype)        { out.append(26) }  // Collar
+        if subtypeIsPantsLike(subtype)    { out.append(contentsOf: [27, 28]) }  // Fit + Rise
+
+        out.append(contentsOf: [4, 5, 6, 7, 8, 9])
+        return out
     }
 }
 
@@ -344,6 +449,10 @@ struct StudioCreateView: View {
     let presetType: String?
     let presetReferenceUrl: String?
     let onDone: () -> Void
+    /// When the caller (e.g. outfit wizard) already knows both the type and
+    /// subtype, we lock the Step 1 chips so the user can only pick a
+    /// reference photo. Backwards-compatible: nil ⇒ classic free-pick Step 1.
+    var presetSubtype: String? = nil
 
     @Environment(\.dismiss) private var dismiss
 
@@ -396,6 +505,7 @@ struct StudioCreateView: View {
             }
             // Seed presets
             if let t = presetType, state.type == nil { state.type = t }
+            if let s = presetSubtype, state.subtype == nil { state.subtype = s }
             if let r = presetReferenceUrl, state.referenceUrl == nil { state.referenceUrl = r }
         }
         .onChange(of: referenceItem) { _, new in
@@ -557,6 +667,16 @@ struct StudioCreateView: View {
         case 16: return state.strap != nil
         case 17: return state.closureType != nil
         case 18: return state.hardware != nil
+        // Aug 2026 subtype-specifics
+        case 20: return state.neckline != nil
+        case 21: return state.hoodieClosure != nil
+        case 22: return state.hoodieDrawstring != nil
+        case 23: return state.cardiganClosure != nil
+        case 24: return state.blazerLapel != nil
+        case 25: return state.blazerButtons != nil
+        case 26: return state.shirtCollar != nil
+        case 27: return state.pantFit != nil
+        case 28: return state.waistRise != nil
         default: return true
         }
     }
@@ -566,7 +686,13 @@ struct StudioCreateView: View {
     @ViewBuilder
     private func stepView(id: Int) -> some View {
         switch id {
-        case 1: Step1TypeAndReference(state: state, referenceUploading: referenceUploading, pickerItem: $referenceItem, onRemoveRef: { state.referenceUrl = nil })
+        case 1: Step1TypeAndReference(
+            state: state,
+            referenceUploading: referenceUploading,
+            pickerItem: $referenceItem,
+            onRemoveRef: { state.referenceUrl = nil },
+            locked: presetType != nil && presetSubtype != nil
+        )
         case 2: ChipSingleStep(title: "Silhouette", subtitle: "How does it sit on the body?", options: SILHOUETTES, selected: state.silhouette, onSelect: { state.silhouette = $0 })
         case 3:
             let isBottomOrDress = state.type == "Bottom" || state.type == "Dress"
@@ -591,6 +717,70 @@ struct StudioCreateView: View {
         case 16: ChipSingleStep(title: "Strap", subtitle: "How is it carried?", options: BAG_STRAPS, selected: state.strap, onSelect: { state.strap = $0 })
         case 17: ChipSingleStep(title: "Closure", subtitle: "How does it fasten?", options: BAG_CLOSURES, selected: state.closureType, onSelect: { state.closureType = $0 })
         case 18: ChipSingleStep(title: "Hardware", subtitle: "Metal accents & finish.", options: BAG_HARDWARE, selected: state.hardware, onSelect: { state.hardware = $0 })
+        // Aug 2026 subtype-specific steps
+        case 20: ChipSingleStep(
+            title: "Neckline",
+            subtitle: "How does the collar sit?",
+            options: necklineOptionsFor(state.subtype),
+            selected: state.neckline,
+            onSelect: { state.neckline = $0 }
+        )
+        case 21: ChipSingleStep(
+            title: "Closure",
+            subtitle: "Pullover, zipped, or half-zip?",
+            options: HOODIE_CLOSURES,
+            selected: state.hoodieClosure,
+            onSelect: { state.hoodieClosure = $0 }
+        )
+        case 22: ChipSingleStep(
+            title: "Drawstring",
+            subtitle: "Hood detail.",
+            options: HOODIE_DRAWSTRING,
+            selected: state.hoodieDrawstring,
+            onSelect: { state.hoodieDrawstring = $0 }
+        )
+        case 23: ChipSingleStep(
+            title: "Cardigan closure",
+            subtitle: "How does the front sit?",
+            options: CARDIGAN_CLOSURES,
+            selected: state.cardiganClosure,
+            onSelect: { state.cardiganClosure = $0 }
+        )
+        case 24: ChipSingleStep(
+            title: "Lapel",
+            subtitle: "Lapel style.",
+            options: BLAZER_LAPELS,
+            selected: state.blazerLapel,
+            onSelect: { state.blazerLapel = $0 }
+        )
+        case 25: ChipSingleStep(
+            title: "Buttons",
+            subtitle: "How many, and single or double breasted?",
+            options: BLAZER_BUTTONS,
+            selected: state.blazerButtons,
+            onSelect: { state.blazerButtons = $0 }
+        )
+        case 26: ChipSingleStep(
+            title: "Collar",
+            subtitle: "Collar style.",
+            options: SHIRT_COLLARS,
+            selected: state.shirtCollar,
+            onSelect: { state.shirtCollar = $0 }
+        )
+        case 27: ChipSingleStep(
+            title: "Fit",
+            subtitle: "Overall leg shape.",
+            options: PANT_FITS,
+            selected: state.pantFit,
+            onSelect: { state.pantFit = $0 }
+        )
+        case 28: ChipSingleStep(
+            title: "Waist rise",
+            subtitle: "Where does the waistband sit?",
+            options: WAIST_RISES,
+            selected: state.waistRise,
+            onSelect: { state.waistRise = $0 }
+        )
         default: EmptyView()
         }
     }
@@ -1045,16 +1235,28 @@ private struct Step1TypeAndReference: View {
     let referenceUploading: Bool
     @Binding var pickerItem: PhotosPickerItem?
     let onRemoveRef: () -> Void
+    /// When true (outfit wizard preselected both type + subtype), render the
+    /// Type + Subcategory rows as read-only chips — the only interactive
+    /// control on this step is the reference photo picker.
+    var locked: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("What are we making?")
+            Text(locked ? "Confirming the piece" : "What are we making?")
                 .font(Serif.display(22))
                 .foregroundStyle(Palette.ink)
+            if locked {
+                Text("Type and subcategory are set by the outfit — you can only add a reference photo here.")
+                    .font(Serif.body(13))
+                    .foregroundStyle(Palette.muted)
+                    .padding(.top, 6)
+            }
 
             FlowLayout(spacing: 8) {
                 ForEach(TYPES, id: \.self) { t in
-                    Chip(text: t, active: state.type == t) {
+                    let active = state.type == t
+                    LockableChip(text: t, active: active, locked: locked) {
+                        guard !locked else { return }
                         if state.type != t {
                             state.type = t
                             state.subtype = nil
@@ -1068,7 +1270,11 @@ private struct Step1TypeAndReference: View {
                 Eyebrow(text: "SUBCATEGORY").padding(.top, 16)
                 FlowLayout(spacing: 8) {
                     ForEach(subs, id: \.self) { s in
-                        Chip(text: s, active: state.subtype == s) { state.subtype = s }
+                        let active = state.subtype == s
+                        LockableChip(text: s, active: active, locked: locked) {
+                            guard !locked else { return }
+                            state.subtype = s
+                        }
                     }
                 }
                 .padding(.top, 8)
@@ -1488,6 +1694,52 @@ private struct Chip: View {
     }
 }
 
+/// Chip variant that supports a `locked` state — used when the outfit wizard
+/// has already decided the type + subtype for this step. Locked non-active
+/// chips fade out and the tap is a no-op (button is disabled). The active
+/// chip stays legible with a subtle "locked" tint so the user can tell what
+/// was preselected.
+private struct LockableChip: View {
+    let text: String
+    let active: Bool
+    let locked: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 4) {
+                if locked && active {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 9, weight: .semibold))
+                }
+                Text(text)
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .background(background)
+            .overlay(Capsule().stroke(borderColor, lineWidth: 1))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(locked)
+        .allowsHitTesting(!locked)
+    }
+
+    private var foreground: Color {
+        if active { return .white }
+        return locked ? Palette.ink.opacity(0.25) : Palette.ink
+    }
+    private var background: Color {
+        if active { return Palette.ink }
+        return Color.clear
+    }
+    private var borderColor: Color {
+        if active { return Palette.ink.opacity(0.9) }
+        return locked ? Palette.ink.opacity(0.15) : Palette.ink.opacity(0.4)
+    }
+}
+
 private struct ColorChip: View {
     let label: String
     let swatch: Color
@@ -1568,4 +1820,1317 @@ func dismissKeyboard() {
     #if canImport(UIKit)
     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     #endif
+}
+
+// MARK: - Studio 2.0 Wizard (Aug 2026)
+// Sequential outfit-builder. Entry point is `StudioCreateGateway`, which
+// forks to either the legacy single-piece `StudioCreateView` or the new
+// `OutfitWizardView`. All new declarations live in this file (per project
+// constraint: no new .swift files — pbxproj is hand-managed).
+
+/// Style presets applied once at the top of an outfit run.
+enum StudioStyle: String, CaseIterable, Identifiable {
+    case oldMoney = "Old Money"
+    case streetwear = "Streetwear"
+    case minimal = "Minimal"
+    case y2k = "Y2K"
+    case editorial = "Editorial"
+    var id: String { rawValue }
+    var promptFragment: String {
+        switch self {
+        case .oldMoney: return "old-money aesthetic, quiet luxury, tailored classics, restrained palette"
+        case .streetwear: return "streetwear proportions, oversized fits, contemporary casual"
+        case .minimal: return "minimalist, clean lines, monochrome, understated"
+        case .y2k: return "Y2K nostalgia, low-rise, glossy fabrics, playful early-2000s references"
+        case .editorial: return "high-fashion editorial styling, dramatic, magazine cover energy"
+        }
+    }
+}
+
+/// Surface on which pieces are rendered. Replaces the old "headless mannequin"
+/// default with a real model as the primary option.
+enum StudioSurface: String, CaseIterable, Identifiable {
+    case model = "Real model"
+    case mannequin = "Mannequin"
+    case flatLay = "Flat lay"
+    var id: String { rawValue }
+    var promptFragment: String {
+        switch self {
+        case .model: return "worn on a young stylish model in a natural pose, editorial fashion photograph, soft window light, minimalist cream studio backdrop, mid-shot 35mm lens aesthetic"
+        case .mannequin: return "worn on a minimalist headless matte-white mannequin against a clean cream studio backdrop, front-facing, magazine editorial styling, natural studio lighting, sharp fabric detail"
+        case .flatLay: return "flat-lay product photograph on a clean cream backdrop, top-down camera, soft diffused studio lighting, sharp fabric detail, editorial catalog aesthetic — NO person, NO mannequin"
+        }
+    }
+}
+
+/// Composition options — order of selection = generation order.
+/// Aug 2026 v3: split coarse `.accessory` into six concrete accessory types
+/// (bag, sunglasses, belt, scarf, hat, jewelry) so each renders with proper
+/// placement on the mannequin, plus expanded top/bottom subtypes.
+enum OutfitPiece: String, CaseIterable, Identifiable, Hashable {
+    // Tops
+    case tshirt   = "tshirt"
+    case shirt    = "shirt"
+    case hoodie   = "hoodie"
+    case cardigan = "cardigan"
+    case blazer   = "blazer"
+    // Bottoms
+    case pants    = "pants"
+    case jeans    = "jeans"
+    case shorts   = "shorts"
+    case skirt    = "skirt"
+    case sweatsuit = "sweatsuit"
+    // Whole-body
+    case dress    = "dress"
+    // Outerwear
+    case jacket   = "jacket"
+    // Footwear
+    case shoes    = "shoes"
+    // Accessories (each with distinct placement)
+    case bag        = "bag"
+    case sunglasses = "sunglasses"
+    case belt       = "belt"
+    case scarf      = "scarf"
+    case hat        = "hat"
+    case jewelry    = "jewelry"
+
+    var id: String { rawValue }
+
+    var emoji: String {
+        switch self {
+        case .tshirt: return "👕"
+        case .shirt: return "👔"
+        case .hoodie: return "🧥"
+        case .cardigan: return "🧶"
+        case .blazer: return "🧥"
+        case .pants: return "👖"
+        case .jeans: return "👖"
+        case .shorts: return "🩳"
+        case .skirt: return "👗"
+        case .sweatsuit: return "🩳"
+        case .dress: return "👗"
+        case .jacket: return "🧥"
+        case .shoes: return "👟"
+        case .bag: return "👜"
+        case .sunglasses: return "🕶️"
+        case .belt: return "🎗️"
+        case .scarf: return "🧣"
+        case .hat: return "🎩"
+        case .jewelry: return "💍"
+        }
+    }
+
+    /// Maps to StudioCreateView TYPES / closet categories.
+    var closetCategory: String {
+        switch self {
+        case .tshirt, .shirt, .hoodie, .cardigan, .blazer: return "top"
+        case .pants, .jeans, .shorts, .skirt, .sweatsuit: return "bottom"
+        case .dress: return "dress"
+        case .jacket: return "outerwear"
+        case .shoes: return "shoes"
+        case .bag, .sunglasses, .belt, .scarf, .hat, .jewelry: return "accessory"
+        }
+    }
+
+    /// The subcategory string used both to preset StudioCreateView's Step 1
+    /// AND to filter the closet picker by subtype (case-insensitive contains).
+    var subtypeHint: String {
+        switch self {
+        case .tshirt: return "T-shirt"
+        case .shirt: return "Shirt"
+        case .hoodie: return "Hoodie"
+        case .cardigan: return "Cardigan"
+        case .blazer: return "Blazer"
+        case .pants: return "Trousers"
+        case .jeans: return "Jeans"
+        case .shorts: return "Shorts"
+        case .skirt: return "Skirt"
+        case .sweatsuit: return "Sweats"
+        case .dress: return "Midi"
+        case .jacket: return "Blazer"
+        case .shoes: return "Sneakers"
+        case .bag: return "Bag"
+        case .sunglasses: return "Sunglasses"
+        case .belt: return "Belt"
+        case .scarf: return "Scarf"
+        case .hat: return "Hat"
+        case .jewelry: return "Jewelry"
+        }
+    }
+
+    /// Short natural-language token used inside prompts.
+    var promptToken: String {
+        switch self {
+        case .tshirt: return "t-shirt"
+        case .shirt: return "button-up shirt"
+        case .hoodie: return "hoodie"
+        case .cardigan: return "cardigan"
+        case .blazer: return "blazer"
+        case .pants: return "trousers"
+        case .jeans: return "jeans"
+        case .shorts: return "shorts"
+        case .skirt: return "skirt"
+        case .sweatsuit: return "matching sweatsuit"
+        case .dress: return "dress"
+        case .jacket: return "jacket"
+        case .shoes: return "pair of shoes"
+        case .bag: return "handbag"
+        case .sunglasses: return "pair of sunglasses"
+        case .belt: return "belt"
+        case .scarf: return "scarf"
+        case .hat: return "hat"
+        case .jewelry: return "jewelry piece"
+        }
+    }
+
+    /// Maps to `StudioCreateView.presetType` (one of TYPES at file top).
+    var presetType: String {
+        switch self {
+        case .tshirt, .shirt, .hoodie, .cardigan, .blazer: return "Top"
+        case .pants, .jeans, .shorts, .skirt, .sweatsuit: return "Bottom"
+        case .dress: return "Dress"
+        case .jacket: return "Outerwear"
+        case .shoes: return "Shoes"
+        case .bag, .sunglasses, .belt, .scarf, .hat, .jewelry: return "Accessory"
+        }
+    }
+
+    /// Localized display label (English) used in the wizard UI.
+    var displayName: String {
+        switch self {
+        case .tshirt: return "T-Shirt"
+        case .shirt: return "Shirt"
+        case .hoodie: return "Hoodie"
+        case .cardigan: return "Cardigan"
+        case .blazer: return "Blazer"
+        case .pants: return "Trousers"
+        case .jeans: return "Jeans"
+        case .shorts: return "Shorts"
+        case .skirt: return "Skirt"
+        case .sweatsuit: return "Sweatsuit"
+        case .dress: return "Dress"
+        case .jacket: return "Jacket"
+        case .shoes: return "Shoes"
+        case .bag: return "Bag"
+        case .sunglasses: return "Sunglasses"
+        case .belt: return "Belt"
+        case .scarf: return "Scarf"
+        case .hat: return "Hat"
+        case .jewelry: return "Jewelry"
+        }
+    }
+
+    /// How this piece is worn/held on a HEADLESS mannequin. Used by the
+    /// combine prompt so the model puts each item in the right place.
+    var placementInstruction: String? {
+        switch self {
+        case .tshirt, .shirt, .hoodie, .cardigan, .blazer, .jacket, .dress, .sweatsuit:
+            return nil  // worn on torso — default layering handles it
+        case .pants, .jeans, .shorts, .skirt:
+            return nil  // worn on legs — default handles it
+        case .shoes:
+            return "shoes on the feet, full footwear visible"
+        case .bag:
+            return "the bag is HELD by the strap or hanging from the shoulder — clearly rendered, not hidden"
+        case .sunglasses:
+            return "the sunglasses HANG from the neckline of the top garment or from the mannequin's collar area (mannequin is headless — do NOT attempt to place them on a face)"
+        case .belt:
+            return "the belt is worn at the natural waist, threaded through belt loops of any bottom or laid over any dress"
+        case .scarf:
+            return "the scarf is draped around the neck stump and shoulders"
+        case .hat:
+            return "the hat is HELD in the mannequin's hand at hip level (mannequin is headless — do NOT attempt to place it on a head)"
+        case .jewelry:
+            return "jewelry is placed on appropriate joints: necklace at the neck stump, bracelets/watches on wrists, rings on fingers"
+        }
+    }
+
+    /// Groups pieces for the picker grid.
+    var group: String {
+        switch self {
+        case .tshirt, .shirt, .hoodie, .cardigan, .blazer: return "Tops"
+        case .pants, .jeans, .shorts, .skirt, .sweatsuit: return "Bottoms"
+        case .dress, .jacket: return "One-piece & Outerwear"
+        case .shoes: return "Footwear"
+        case .bag, .sunglasses, .belt, .scarf, .hat, .jewelry: return "Accessories"
+        }
+    }
+}
+
+// MARK: - Gateway
+
+struct StudioCreateGateway: View {
+    let onDone: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    enum Route: Hashable { case single, outfit }
+    @State private var route: Route? = nil
+
+    var body: some View {
+        Group {
+            switch route {
+            case .single:
+                StudioCreateView(
+                    editingPieceId: nil,
+                    presetType: nil,
+                    presetReferenceUrl: nil,
+                    onDone: onDone
+                )
+            case .outfit:
+                OutfitWizardView(onDone: onDone)
+            case .none:
+                gatewayPicker
+            }
+        }
+    }
+
+    private var gatewayPicker: some View {
+        ZStack {
+            Palette.paper.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack {
+                        Eyebrow(text: "STUDIO")
+                        Spacer()
+                        Button(action: onDone) {
+                            Image(systemName: "xmark")
+                                .foregroundStyle(Palette.ink)
+                                .frame(width: 36, height: 36)
+                        }
+                    }
+                    .padding(.horizontal, 22)
+                    .padding(.top, 12)
+
+                    // Editorial masthead
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Compose")
+                            .font(Serif.display(48))
+                            .foregroundStyle(Palette.ink)
+                        Text("a new look.")
+                            .font(Serif.display(48).italic())
+                            .foregroundStyle(Palette.ink)
+                    }
+                    .padding(.horizontal, 22)
+                    .padding(.top, 24)
+
+                    Text("Start with a single piece or build a full outfit one item at a time.")
+                        .font(Serif.body(15))
+                        .foregroundStyle(Palette.muted)
+                        .padding(.horizontal, 22)
+                        .padding(.top, 12)
+                        .padding(.bottom, 32)
+
+                    VStack(spacing: 16) {
+                        editorialCard(
+                            eyebrow: "MODE · 01",
+                            title: "Single Piece",
+                            body: "One garment, three variations. Pick your favourite — the rest go to your Journal drafts.",
+                            price: Supa.singlePieceCost,
+                            accent: false,
+                            badge: nil,
+                            action: { Haptic.tap(); route = .single }
+                        )
+                        editorialCard(
+                            eyebrow: "MODE · 02",
+                            title: "Full Outfit",
+                            body: "Build a look piece by piece. Choose the parts, pick a style, and Hem stitches them together on one model.",
+                            price: Supa.outfitCost(pieceCount: 3),
+                            accent: true,
+                            badge: "NEW",
+                            action: { Haptic.tap(); route = .outfit }
+                        )
+                    }
+                    .padding(.horizontal, 22)
+
+                    // Small print — sets expectations without cluttering
+                    Text("Free plan · up to 2 pieces per outfit. Go Pro for 3 or more.")
+                        .font(Serif.italic(12))
+                        .foregroundStyle(Palette.muted)
+                        .padding(.horizontal, 22)
+                        .padding(.top, 24)
+                        .padding(.bottom, 36)
+
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+
+    private func editorialCard(
+        eyebrow: String,
+        title: String,
+        body: String,
+        price: Int,
+        accent: Bool,
+        badge: String?,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text(eyebrow)
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(2)
+                        .foregroundStyle(accent ? .white.opacity(0.72) : Palette.bronze)
+                    Spacer()
+                    if let badge {
+                        Text(badge)
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1.5)
+                            .foregroundStyle(accent ? Palette.ink : .white)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(accent ? Color.white : Palette.bronze)
+                            .clipShape(Capsule())
+                    }
+                }
+                Text(title)
+                    .font(Serif.display(30))
+                    .foregroundStyle(accent ? .white : Palette.ink)
+                Text(body)
+                    .font(Serif.body(14))
+                    .foregroundStyle(accent ? .white.opacity(0.82) : Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                Divider()
+                    .background(accent ? Color.white.opacity(0.25) : Palette.hairline)
+                    .padding(.vertical, 4)
+                HStack(alignment: .firstTextBaseline) {
+                    Text("From")
+                        .font(.system(size: 11, weight: .semibold))
+                        .tracking(1.5)
+                        .foregroundStyle(accent ? .white.opacity(0.6) : Palette.muted)
+                    Text("✦ \(price)")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(accent ? .white : Palette.ink)
+                    Text("credits")
+                        .font(Serif.italic(13))
+                        .foregroundStyle(accent ? .white.opacity(0.6) : Palette.muted)
+                    Spacer()
+                    HStack(spacing: 6) {
+                        Text("Begin")
+                            .font(.system(size: 12, weight: .semibold))
+                            .tracking(1.5)
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(accent ? .white : Palette.bronze)
+                }
+            }
+            .padding(22)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(accent ? Palette.ink : Palette.card)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(accent ? Color.clear : Palette.hairline, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: Palette.ink.opacity(accent ? 0.18 : 0.04),
+                    radius: accent ? 14 : 6, x: 0, y: accent ? 8 : 3)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Outfit wizard state + view
+// Sequential outfit builder. Each selected piece runs through the exact same
+// StudioCreateView flow as Single Piece — asking the same questions (type,
+// colours, fabrics, sleeve, etc). When all pieces are done we optionally
+// combine them onto one model.
+
+@MainActor
+final class OutfitWizardModel: ObservableObject {
+    // Composition
+    @Published var selection: [OutfitPiece] = []
+    @Published var autoCombine: Bool = true
+    /// Pieces the user pre-sourced from their existing Studio closet. Key =
+    /// the OutfitPiece slot, value = (imageUrl, closetItemId). During
+    /// iteration, if a slot is prefilled the wizard skips generation and
+    /// reuses the existing item.
+    @Published var prefilled: [OutfitPiece: (url: String, itemId: String)] = [:]
+
+    // Runtime — per step
+    @Published var currentStep: Int = 0            // 0-based index into `selection`
+    @Published var savedUrls: [String] = []        // image URLs of saved pieces (in order)
+    @Published var savedPieceIds: [String] = []    // closet item ids (best-effort — filled by post-step hydration)
+
+    // Combine — front + side view rendered together on one mannequin.
+    @Published var combining = false
+    @Published var combinedFrontUrl: String? = nil
+    @Published var combinedSideUrl: String? = nil
+    @Published var combineError: String? = nil
+
+    var totalPieces: Int { selection.count }
+    var currentPiece: OutfitPiece? {
+        guard currentStep < selection.count else { return nil }
+        return selection[currentStep]
+    }
+    var isDone: Bool { currentStep >= selection.count }
+}
+
+struct OutfitWizardView: View {
+    let onDone: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var m = OutfitWizardModel()
+    @StateObject private var credits = CreditsBus.shared
+
+    // Four phases: pick the pieces, walk through StudioCreateView per piece,
+    // combine them (loading), then done.
+    enum Phase { case compose, iterating, combining, done }
+    @State private var phase: Phase = .compose
+    @State private var showProUpsell = false
+    /// Bumped every time we advance to force `StudioCreateView` to fully
+    /// re-init for the next piece (fresh WizardState).
+    @State private var stepKey: Int = 0
+
+    var body: some View {
+        ZStack {
+            Palette.paper.ignoresSafeArea()
+            VStack(spacing: 0) {
+                header
+                Rectangle().fill(Palette.hairline).frame(height: 1)
+                content
+            }
+        }
+        .alert("Pro required", isPresented: $showProUpsell) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Free plan is capped at 2 pieces per outfit. Go Pro for 3 or more.")
+        }
+        .sheet(item: Binding(
+            get: { pickerForPiece.map { PieceKey(piece: $0) } },
+            set: { if $0 == nil { pickerForPiece = nil } }
+        )) { _ in
+            closetPickerSheet
+        }
+    }
+
+    // MARK: - Header
+
+    private var header: some View {
+        HStack {
+            Button(action: onDone) {
+                Image(systemName: "xmark")
+                    .foregroundStyle(Palette.ink)
+                    .frame(width: 36, height: 36)
+            }
+            Spacer()
+            VStack(spacing: 2) {
+                Text(eyebrowText)
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(2)
+                    .foregroundStyle(Palette.bronze)
+                if phase == .iterating, let piece = m.currentPiece {
+                    Text(piece.displayName)
+                        .font(Serif.display(15))
+                        .foregroundStyle(Palette.ink)
+                }
+            }
+            Spacer()
+            if let bal = credits.balance {
+                Text("✦ \(bal)")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Palette.ink)
+                    .frame(width: 60, alignment: .trailing)
+            } else {
+                Spacer().frame(width: 60)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    private var eyebrowText: String {
+        switch phase {
+        case .compose: return "OUTFIT · PIECES"
+        case .iterating:
+            if m.currentPiece != nil {
+                return "STEP \(m.currentStep + 1) OF \(m.totalPieces)"
+            }
+            return "OUTFIT · WRAPPING UP"
+        case .combining: return "OUTFIT · COMPOSING"
+        case .done: return "OUTFIT · READY"
+        }
+    }
+
+    // MARK: - Content router
+
+    @ViewBuilder
+    private var content: some View {
+        switch phase {
+        case .compose: composeView
+        case .iterating: iterateView
+        case .combining: combiningView
+        case .done: doneView
+        }
+    }
+
+    // MARK: - Combining loading screen
+    // Full-screen editorial waiting state — front + side render in parallel
+    // takes ~10-20s. Show progress instead of a bare spinner.
+
+    private var combiningView: some View {
+        WaitingOverlay(
+            eyebrow: "COMPOSING THE OUTFIT",
+            title: "Dressing the mannequin",
+            tips: [
+                "Placing each piece exactly as you designed it…",
+                "No extras, no substitutes — just what you chose.",
+                "Front view and side view side-by-side.",
+                "Editorial catalog lighting, clean cream backdrop.",
+            ]
+        )
+    }
+
+    // MARK: - Phase 1: pick pieces + toggle auto-combine
+
+    private var composeView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Which pieces?")
+                        .font(Serif.display(30))
+                        .foregroundStyle(Palette.ink)
+                    Text("Tap in the order you want to design them. Each piece walks through the same design questions — one at a time.")
+                        .font(Serif.body(14))
+                        .foregroundStyle(Palette.muted)
+                }
+
+                // Existing-pieces strip: browse before deciding what to make.
+                closetStrip
+
+                // Grouped picker — tops / bottoms / one-piece / footwear / accessories.
+                ForEach(pieceGroups, id: \.name) { group in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(group.name.uppercased())
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(1.8)
+                            .foregroundStyle(Palette.bronze)
+                        let cols = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
+                        LazyVGrid(columns: cols, spacing: 10) {
+                            ForEach(group.pieces) { piece in
+                                pieceChip(piece)
+                            }
+                        }
+                    }
+                }
+
+                if !m.selection.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("ORDER · \(m.selection.count) \(m.selection.count == 1 ? "piece" : "pieces")")
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(1.8)
+                            .foregroundStyle(Palette.bronze)
+                        VStack(spacing: 8) {
+                            ForEach(Array(m.selection.enumerated()), id: \.offset) { idx, p in
+                                orderRow(idx: idx, piece: p)
+                            }
+                        }
+                        Text("Tap a slot to pull an existing piece from your closet instead of generating a new one.")
+                            .font(Serif.italic(11))
+                            .foregroundStyle(Palette.muted)
+                    }
+                    .padding(.top, 4)
+                }
+
+                Toggle(isOn: $m.autoCombine) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Combine on one model at the end")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Palette.ink)
+                        Text("Stitch every piece into a single editorial render (+\(Supa.studioCombineStandaloneCost) credits).")
+                            .font(Serif.body(12))
+                            .foregroundStyle(Palette.muted)
+                    }
+                }
+                .tint(Palette.ink)
+                .padding(16)
+                .background(Palette.card)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Palette.hairline, lineWidth: 1))
+
+                PrimaryButton(
+                    title: m.selection.count == 1 ? "Start" : "Start · \(m.selection.count) pieces",
+                    enabled: m.selection.count >= 1
+                ) {
+                    Haptic.tap()
+                    m.currentStep = 0
+                    stepKey = 0
+                    skipPrefilled()
+                    if m.isDone {
+                        // Everything prefilled — jump straight to combine.
+                        phase = .combining
+                        Task { await onAllStepsComplete() }
+                    } else {
+                        phase = .iterating
+                    }
+                }
+                .padding(.top, 4)
+            }
+            .padding(22)
+        }
+    }
+
+    // MARK: - Group definition for the composer picker
+
+    private struct PieceGroup { let name: String; let pieces: [OutfitPiece] }
+    private var pieceGroups: [PieceGroup] {
+        [
+            PieceGroup(name: "Tops", pieces: [.tshirt, .shirt, .hoodie, .cardigan, .blazer]),
+            PieceGroup(name: "Bottoms", pieces: [.pants, .jeans, .shorts, .skirt, .sweatsuit]),
+            PieceGroup(name: "One-piece & Outerwear", pieces: [.dress, .jacket]),
+            PieceGroup(name: "Footwear", pieces: [.shoes]),
+            PieceGroup(name: "Accessories", pieces: [.bag, .sunglasses, .belt, .scarf, .hat, .jewelry]),
+        ]
+    }
+
+    // MARK: - Closet strip (browse existing pieces at the top of compose)
+
+    @State private var closetStripItems: [ClosetItem] = []
+    @State private var closetStripUrls: [String: String] = [:]
+    @State private var closetStripLoaded: Bool = false
+
+    @ViewBuilder
+    private var closetStrip: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("FROM YOUR CLOSET")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.8)
+                    .foregroundStyle(Palette.bronze)
+                Spacer()
+                Text("Tap to add to the outfit")
+                    .font(Serif.italic(11))
+                    .foregroundStyle(Palette.muted)
+            }
+            if !closetStripLoaded {
+                HStack(spacing: 8) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Palette.card)
+                            .frame(width: 90, height: 110)
+                    }
+                }
+            } else if closetStripItems.isEmpty {
+                Text("Nothing here yet — generate a piece and it'll show up.")
+                    .font(Serif.italic(12))
+                    .foregroundStyle(Palette.muted)
+                    .padding(.vertical, 8)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(closetStripItems, id: \.id) { item in
+                            closetStripTile(item)
+                        }
+                    }
+                }
+            }
+        }
+        .task {
+            guard !closetStripLoaded else { return }
+            await loadClosetStrip()
+        }
+    }
+
+    private func loadClosetStrip() async {
+        defer { closetStripLoaded = true }
+        do {
+            let all = try await Repo.shared.closetItems()
+            let recent = Array(all.prefix(20))
+            var urls: [String: String] = [:]
+            for it in recent {
+                if let id = it.id, let p = it.image_path,
+                   let s = try? await Repo.shared.signedClosetUrl(p) {
+                    urls[id] = s
+                }
+            }
+            closetStripItems = recent
+            closetStripUrls = urls
+        } catch {
+            closetStripItems = []
+        }
+    }
+
+    /// Given a closet item, figure out which OutfitPiece slot it fits.
+    private func inferPiece(_ item: ClosetItem) -> OutfitPiece? {
+        let sub = item.subcategory?.lowercased() ?? ""
+        // Try exact subtypeHint match first.
+        if let byHint = OutfitPiece.allCases.first(where: { $0.subtypeHint.lowercased() == sub }) {
+            return byHint
+        }
+        // Fall back to first piece with matching closetCategory.
+        return OutfitPiece.allCases.first { $0.closetCategory == item.category }
+    }
+
+    @ViewBuilder
+    private func closetStripTile(_ item: ClosetItem) -> some View {
+        let piece = inferPiece(item)
+        let alreadyPicked = piece.flatMap { m.prefilled[$0]?.itemId } == item.id
+        Button {
+            guard let p = piece, let id = item.id else { return }
+            let url = closetStripUrls[id] ?? ""
+            Haptic.tap()
+            if !m.selection.contains(p) {
+                if !RcBilling.shared.isPro && m.selection.count >= 2 {
+                    showProUpsell = true
+                    return
+                }
+                m.selection.append(p)
+            }
+            m.prefilled[p] = (url: url, itemId: id)
+        } label: {
+            VStack(spacing: 4) {
+                ZStack(alignment: .topTrailing) {
+                    Group {
+                        if let id = item.id, let u = closetStripUrls[id], let purl = URL(string: u) {
+                            AsyncImage(url: purl) { img in img.resizable().scaledToFill() }
+                                placeholder: { Rectangle().fill(Palette.card) }
+                        } else {
+                            Rectangle().fill(Palette.card)
+                        }
+                    }
+                    .frame(width: 90, height: 110)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10)
+                        .stroke(alreadyPicked ? Palette.ink : Palette.hairline, lineWidth: alreadyPicked ? 2 : 1))
+                    if alreadyPicked {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.white, Palette.ink)
+                            .font(.system(size: 18))
+                            .padding(4)
+                    }
+                }
+                Text(piece?.displayName ?? "Piece")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Palette.muted)
+                    .lineLimit(1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func pieceChip(_ piece: OutfitPiece) -> some View {
+        let selected = m.selection.contains(piece)
+        let ordinal = m.selection.firstIndex(of: piece).map { $0 + 1 }
+        return Button {
+            togglePiece(piece)
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(piece.emoji).font(.system(size: 28))
+                    Spacer()
+                    if let o = ordinal {
+                        Text("\(o)")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 22, height: 22)
+                            .background(Circle().fill(Palette.ink))
+                    }
+                }
+                Text(piece.displayName)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Palette.ink)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(selected ? Palette.card : Palette.paper)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(selected ? Palette.ink : Palette.hairline, lineWidth: selected ? 1.4 : 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func togglePiece(_ piece: OutfitPiece) {
+        Haptic.chip()
+        if let idx = m.selection.firstIndex(of: piece) {
+            m.selection.remove(at: idx)
+            return
+        }
+        let isPro = RcBilling.shared.isPro
+        if !isPro && m.selection.count >= 2 {
+            showProUpsell = true
+            return
+        }
+        m.selection.append(piece)
+    }
+
+    // MARK: - Order row + closet picker
+
+    /// Wrapper so we can use `.sheet(item:)` with the enum picker state.
+    private struct PieceKey: Identifiable {
+        let piece: OutfitPiece
+        var id: String { piece.rawValue }
+    }
+
+    @State private var pickerForPiece: OutfitPiece? = nil
+    @State private var closetOptions: [ClosetItem] = []
+    @State private var closetOptionUrls: [String: String] = [:]
+    @State private var pickerLoading = false
+
+    private func orderRow(idx: Int, piece: OutfitPiece) -> some View {
+        let pre = m.prefilled[piece]
+        return Button(action: {
+            Haptic.chip()
+            pickerForPiece = piece
+            Task { await loadClosetOptions(for: piece) }
+        }) {
+            HStack(spacing: 10) {
+                Text("\(idx + 1).")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Palette.bronze)
+                    .frame(width: 20, alignment: .leading)
+                Text(piece.displayName)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Palette.ink)
+                Spacer()
+                if pre != nil {
+                    Text("Using existing")
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(Palette.ink)
+                        .clipShape(Capsule())
+                } else {
+                    Text("Generate new")
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1)
+                        .foregroundStyle(Palette.muted)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Palette.bronze)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 10)
+            .background(Palette.card)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Palette.hairline, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func loadClosetOptions(for piece: OutfitPiece) async {
+        pickerLoading = true
+        defer { pickerLoading = false }
+        do {
+            let all = try await Repo.shared.closetItems()
+            let hint = piece.subtypeHint.lowercased()
+            let filtered = all.filter { item in
+                guard item.category == piece.closetCategory else { return false }
+                // For coarse categories where subtype hint = the only subtype
+                // (e.g. dress → "Midi"), be tolerant: accept if subcategory
+                // is missing OR fuzzy-matches the hint OR reverse. Accessories
+                // MUST match by subcategory since bag/glasses/belt all live
+                // under "accessory".
+                if item.category == "accessory" {
+                    guard let sub = item.subcategory?.lowercased() else { return false }
+                    return sub.contains(hint) || hint.contains(sub)
+                }
+                guard let sub = item.subcategory?.lowercased(), !sub.isEmpty else { return true }
+                return sub.contains(hint) || hint.contains(sub)
+            }
+            closetOptions = filtered
+            var urls: [String: String] = [:]
+            for it in filtered {
+                if let id = it.id, let p = it.image_path,
+                   let s = try? await Repo.shared.signedClosetUrl(p) {
+                    urls[id] = s
+                }
+            }
+            closetOptionUrls = urls
+        } catch {
+            closetOptions = []
+            closetOptionUrls = [:]
+        }
+    }
+
+    private var closetPickerSheet: some View {
+        NavigationStack {
+            ScrollView {
+                if pickerLoading {
+                    ProgressView().padding(40)
+                } else if closetOptions.isEmpty {
+                    VStack(spacing: 10) {
+                        Text("Nothing in your Studio closet for this slot yet.")
+                            .font(Serif.body(14))
+                            .foregroundStyle(Palette.muted)
+                            .multilineTextAlignment(.center)
+                        Text("Generate one and it'll appear here next time.")
+                            .font(Serif.italic(12))
+                            .foregroundStyle(Palette.muted)
+                    }
+                    .padding(40)
+                } else {
+                    let cols = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
+                    LazyVGrid(columns: cols, spacing: 10) {
+                        ForEach(closetOptions, id: \.id) { it in
+                            closetTile(it)
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+            .navigationTitle("Pick from your closet")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { pickerForPiece = nil }
+                }
+                if let p = pickerForPiece, m.prefilled[p] != nil {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Clear") {
+                            m.prefilled.removeValue(forKey: p)
+                            pickerForPiece = nil
+                        }
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    @ViewBuilder
+    private func closetTile(_ item: ClosetItem) -> some View {
+        Button {
+            guard let piece = pickerForPiece, let id = item.id else { return }
+            let url = closetOptionUrls[id] ?? ""
+            m.prefilled[piece] = (url: url, itemId: id)
+            Haptic.tap()
+            pickerForPiece = nil
+        } label: {
+            VStack(spacing: 4) {
+                Group {
+                    if let id = item.id, let u = closetOptionUrls[id], let purl = URL(string: u) {
+                        AsyncImage(url: purl) { img in img.resizable().scaledToFill() }
+                            placeholder: { Rectangle().fill(Palette.card) }
+                    } else {
+                        Rectangle().fill(Palette.card)
+                    }
+                }
+                .frame(height: 120)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                Text(item.name ?? item.subcategory ?? "Piece")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Phase 2: iterate — reuse StudioCreateView per piece
+    // Prefilled slots are ALREADY skipped by `skipPrefilled()` at the compose→
+    // iterate transition (and again after every `advanceStep`) so by the time
+    // this renders, `currentPiece` is guaranteed to be a fresh slot that needs
+    // the guided design flow.
+
+    @ViewBuilder
+    private var iterateView: some View {
+        if let piece = m.currentPiece {
+            StudioCreateView(
+                editingPieceId: nil,
+                presetType: piece.presetType,
+                presetReferenceUrl: nil,
+                onDone: {
+                    Task { await advanceStep() }
+                },
+                presetSubtype: piece.subtypeHint
+            )
+            .id(stepKey)
+        } else {
+            ProgressView().onAppear {
+                Task { await onAllStepsComplete() }
+            }
+        }
+    }
+
+    // MARK: - Phase 3: done + optional combined result
+
+    private var doneView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Outfit ready.")
+                    .font(Serif.display(30))
+                    .foregroundStyle(Palette.ink)
+                Text("All \(m.totalPieces) pieces are saved to your Studio closet.")
+                    .font(Serif.body(14))
+                    .foregroundStyle(Palette.muted)
+
+                if m.combining {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                        Text("Combining pieces on one mannequin…")
+                            .font(Serif.italic(13))
+                            .foregroundStyle(Palette.muted)
+                    }
+                    .padding(.top, 8)
+                } else if m.combinedFrontUrl != nil || m.combinedSideUrl != nil {
+                    Text("THE COMPOSED LOOK · SWIPE FOR SIDE")
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1.8)
+                        .foregroundStyle(Palette.bronze)
+                        .padding(.top, 6)
+                    combinedPager
+                } else if let ce = m.combineError {
+                    Text("Combine failed: \(ce)")
+                        .font(Serif.body(12))
+                        .foregroundStyle(Palette.roastRed)
+                }
+
+                PrimaryButton(title: "Done") {
+                    Haptic.tap()
+                    onDone()
+                }
+                .padding(.top, 10)
+            }
+            .padding(22)
+        }
+    }
+
+    // MARK: - Step advance
+
+    /// Called when a single-piece StudioCreateView finishes.
+    private func advanceStep(prefilledSkip: Bool = false) async {
+        m.currentStep += 1
+        stepKey += 1
+        skipPrefilled()
+        if m.isDone {
+            await onAllStepsComplete()
+        }
+    }
+
+    /// Walk `currentStep` past any consecutive prefilled slots so we never
+    /// try to render StudioCreateView for a slot that already has an image.
+    private func skipPrefilled() {
+        while m.currentStep < m.totalPieces,
+              let piece = m.currentPiece,
+              m.prefilled[piece] != nil {
+            m.currentStep += 1
+            stepKey += 1
+        }
+    }
+
+    private func onAllStepsComplete() async {
+        // Best-effort: pull the last N closet items owned by this user tagged
+        // as recent studio_gen/outfit and snapshot their URLs so we can combine
+        // them + show thumbnails on the done screen.
+        await hydrateSavedUrls()
+        if m.autoCombine, m.savedUrls.count >= 2 {
+            phase = .combining
+            await runCombine()
+        }
+        phase = .done
+    }
+
+    private func hydrateSavedUrls() async {
+        // Build the combine input in the order the user selected. For prefilled
+        // slots use the closet URL directly; for the rest pull the most recent
+        // closet items (freshly generated during iteration).
+        var urls: [String] = []
+        // Fresh generations end up in the closet in insertion order — newest
+        // first. Count how many slots were NOT prefilled: those are what got
+        // freshly generated and now sit at the top of the closet.
+        let freshCount = m.selection.filter { m.prefilled[$0] == nil }.count
+        var freshUrls: [String] = []
+        do {
+            let items = try await Repo.shared.closetItems()
+            let recent = Array(items.prefix(freshCount))
+            for it in recent {
+                if let p = it.image_path, let signed = try? await Repo.shared.signedClosetUrl(p) {
+                    freshUrls.append(signed)
+                }
+            }
+        } catch {
+            // Non-critical
+        }
+        // Walk the selection in order; fill from prefilled or from freshUrls.
+        var freshIdx = 0
+        for piece in m.selection {
+            if let pre = m.prefilled[piece] {
+                if !pre.url.isEmpty { urls.append(pre.url) }
+            } else if freshIdx < freshUrls.count {
+                urls.append(freshUrls[freshIdx])
+                freshIdx += 1
+            }
+        }
+        m.savedUrls = urls
+    }
+
+    /// Big swipeable pager showing Front and Side renders full-width.
+    /// Uses TabView(.page) so it feels native iOS.
+    @State private var pagerIndex: Int = 0
+    private var combinedPager: some View {
+        VStack(spacing: 10) {
+            TabView(selection: $pagerIndex) {
+                combinedPage(url: m.combinedFrontUrl, caption: "FRONT VIEW")
+                    .tag(0)
+                combinedPage(url: m.combinedSideUrl, caption: "SIDE VIEW")
+                    .tag(1)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .aspectRatio(3.0/4.0, contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            HStack(spacing: 8) {
+                ForEach(0..<2, id: \.self) { i in
+                    Circle()
+                        .fill(pagerIndex == i ? Palette.ink : Palette.hairline)
+                        .frame(width: 6, height: 6)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func combinedPage(url: String?, caption: String) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            Group {
+                if let u = url, let purl = URL(string: u) {
+                    AsyncImage(url: purl) { img in
+                        img.resizable().scaledToFit()
+                    } placeholder: {
+                        Rectangle().fill(Palette.card).overlay(ProgressView())
+                    }
+                } else {
+                    Rectangle().fill(Palette.card)
+                        .overlay(ProgressView())
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Palette.hairline, lineWidth: 1))
+
+            Text(caption)
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.8)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(Palette.ink.opacity(0.7))
+                .clipShape(Capsule())
+                .padding(12)
+        }
+    }
+
+    // MARK: - True multi-piece combine
+    //
+    // Two parallel generatePiece calls — one for front view, one for side
+    // view. Prompt describes the pieces + layering + explicitly bans any
+    // magazine chrome (masthead, price, barcode, headlines). The individual
+    // piece renders are passed as reference images so Nano Banana / Fal can
+    // preserve their visual identity.
+    private func runCombine() async {
+        m.combining = true
+        m.combineError = nil
+        m.combinedFrontUrl = nil
+        m.combinedSideUrl = nil
+        defer { m.combining = false }
+        guard m.savedUrls.count >= 2 else { return }
+
+        let refs = m.savedUrls
+
+        async let front = combineCall(view: "front", refs: refs)
+        async let side  = combineCall(view: "side",  refs: refs)
+        let (fUrl, sUrl) = await (front, side)
+
+        m.combinedFrontUrl = fUrl
+        m.combinedSideUrl  = sUrl
+
+        // Charge only if at least one view succeeded.
+        if fUrl != nil || sUrl != nil {
+            try? await Repo.shared.spendCredits(amount: Supa.studioCombineStandaloneCost, kind: "studio_outfit_combine")
+            await credits.refresh()
+            // Persist FRONT (canonical) and SIDE (sibling) so the detail view
+            // can offer swipe-between-views once we wire that in Journal.
+            if let uid = Repo.shared.userId {
+                let label = m.selection.map { $0.displayName }.joined(separator: " + ")
+                var frontId: String? = nil
+                if let f = fUrl {
+                    do {
+                        let bytes = try await Repo.shared.downloadBytes(f)
+                        let path = try await Repo.shared.uploadOutfitPhoto(bytes: bytes, ext: "png")
+                        let inserted = try await Repo.shared.insertOutfit(OutfitInsert(
+                            user_id: uid,
+                            photo_path: path,
+                            score: 0.0,
+                            occasion: "Studio",
+                            hem_comment: "Studio outfit · \(label)",
+                            kind: "outfit_studio"
+                        ))
+                        frontId = inserted.id
+                    } catch { /* non-fatal */ }
+                }
+                if let s = sUrl {
+                    do {
+                        let bytes = try await Repo.shared.downloadBytes(s)
+                        let path = try await Repo.shared.uploadOutfitPhoto(bytes: bytes, ext: "png")
+                        _ = try await Repo.shared.insertOutfit(OutfitInsert(
+                            user_id: uid,
+                            photo_path: path,
+                            score: 0.0,
+                            occasion: "Studio",
+                            hem_comment: "Studio outfit (side view) · \(label)",
+                            kind: "outfit_studio_side",
+                            linked_piece_id: frontId
+                        ))
+                    } catch { /* non-fatal */ }
+                }
+            }
+        } else {
+            m.combineError = "no image returned"
+        }
+    }
+
+    private func combineCall(view: String, refs: [String]) async -> String? {
+        let pieceNarrative = m.selection.enumerated().map { i, p in
+            "image \(i + 1) is the user's chosen \(p.displayName.lowercased())"
+        }.joined(separator: "; ")
+        let providedList = m.selection.map { $0.displayName.lowercased() }.joined(separator: ", ")
+        let viewClause = view == "front"
+            ? "Straight-on front view, mannequin facing the camera."
+            : "90-degree side profile view, mannequin turned to their left, showing the silhouette."
+
+        // Per-piece placement instructions — accessories need explicit handling
+        // on a HEADLESS mannequin (no face → no glasses/hats on head).
+        let placementLines = m.selection.compactMap { piece -> String? in
+            guard let ins = piece.placementInstruction else { return nil }
+            return "- \(ins)"
+        }
+        let placementBlock = placementLines.isEmpty
+            ? ""
+            : "\nPLACEMENT:\n" + placementLines.joined(separator: "\n")
+
+        // STRICT prompt — user complained the model was inventing extra
+        // garments (adding a t-shirt under a cardigan, adding shorts, etc)
+        // AND that bags weren't being rendered at all.
+        let prompt = """
+        Studio product photograph. Dress a SINGLE headless matte-white androgynous-form MANNEQUIN with EXACTLY these \(m.selection.count) piece(s) and nothing else: \(providedList).
+
+        MANNEQUIN REQUIREMENTS:
+        - Full body visible from shoulders to feet, both arms attached, standing upright, front/side facing per the view instruction below.
+        - The mannequin has NO head, matte-white plastic surface, standard fashion catalog form.
+
+        HARD RULES:
+        - Use ONLY the items shown in the reference images. Do NOT add, invent, substitute, or infer any additional clothing.
+        - If no top was provided, leave the torso bare (mannequin surface visible). Do NOT invent a t-shirt.
+        - If no bottom was provided, leave the legs bare. Do NOT invent trousers, shorts, or a skirt.
+        - If no shoes were provided, leave the feet bare. Do NOT invent shoes.
+        - Preserve each item's exact colour, cut, buttons, texture, and details as they appear in the reference images. \(pieceNarrative).
+        - Layer the provided garments naturally (baselayers under overlayers, bottoms on legs).
+        \(placementBlock)
+
+        SCENE:
+        Clean cream studio backdrop. Soft diffused studio lighting. Editorial catalog aesthetic. Sharp fabric, hardware, and stitching detail. \(viewClause).
+
+        ABSOLUTELY FORBIDDEN:
+        No magazine cover. No masthead. No text overlay. No headline. No pull-quote. No price tag. No barcode. No logo. No watermark. No accompanying items beyond the ones listed above.
+        """
+
+        do {
+            let r = try await Repo.shared.generatePiece(prompt: prompt, imageUrls: refs)
+            if let u = r.image_url, !u.isEmpty { return u }
+        } catch {
+            // Failure returns nil — caller records error if both views fail.
+        }
+        return nil
+    }
 }

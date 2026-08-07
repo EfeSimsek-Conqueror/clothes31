@@ -84,17 +84,17 @@ struct CameraMenuSheet: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { CameraMenuBus.shared.request(.versus) }
                     })
                 Hairline()
-                row("roast", icon: "flame.fill",
-                    title: "Roast this",
-                    subtitle: "Brutal mode, shareable card.",
-                    cost: "\(Supa.roastCost) credits",
-                    description: "Brutal mode, locked. Hem roasts the outfit, never the person, and always ends with a fix.",
-                    needs: "1 photo.",
-                    goLabel: "GO →",
+                row("chat", icon: "bubble.left.and.bubble.right.fill",
+                    title: "Chat with Hem",
+                    subtitle: "Ask anything — fit, occasion, swap ideas.",
+                    cost: "free",
+                    description: "Your stylist on tap. Send a photo or a question — Hem answers honestly, in one voice. Remembers your recent fits.",
+                    needs: "Nothing. Just start typing.",
+                    goLabel: "OPEN →",
                     proLocked: false,
                     onGo: {
                         dismiss()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { CameraMenuBus.shared.request(.roast) }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { CameraMenuBus.shared.request(.chat) }
                     })
                 Hairline()
                 row("decode", icon: "paintpalette.fill",

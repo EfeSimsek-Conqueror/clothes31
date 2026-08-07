@@ -38,7 +38,9 @@ struct YouSheet: View {
                     header
                     LowCreditsBanner()
                     statsGrid
-                    honestySection
+                    // honestySection removed Aug 2026 — single "honest" tone
+                    // is now the only mode. Kept the helper below in case we
+                    // reintroduce a toggle later.
                     quoteCard
                     rowsSection
                     signOutButton

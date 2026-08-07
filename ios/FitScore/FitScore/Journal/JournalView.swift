@@ -33,7 +33,6 @@ struct JournalView: View {
                 if loaded && !outfits.isEmpty {
                     styleDnaCard
                 }
-                filterBar
                 if !loaded {
                     skeleton.padding(.top, 24)
                 } else if orderedMonths.isEmpty {
@@ -49,6 +48,19 @@ struct JournalView: View {
                 Spacer(minLength: 60)
             }
             .padding(.vertical, 16)
+        }
+        // Pin the filter bar to the top so it never scrolls behind the
+        // status bar / dynamic island. Also gives it a solid backdrop so
+        // journal content scrolls beneath it cleanly.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            filterBar
+                .padding(.top, 6)
+                .padding(.bottom, 4)
+                .background(Palette.paper)
+                .overlay(
+                    Rectangle().fill(Palette.hairline).frame(height: 1),
+                    alignment: .bottom
+                )
         }
         .background(Palette.paper.ignoresSafeArea())
         .refreshable { await load() }
@@ -277,17 +289,23 @@ struct JournalView: View {
                 openOutfitId = id
             } label: {
                 ZStack(alignment: .topTrailing) {
+                    // scaledToFit so the whole garment/mannequin shows without
+                    // edge-cropping. Aspect-ratio locked to 3:4 (portrait) so
+                    // the card stays visually consistent even when the source
+                    // photo's ratio drifts a bit.
                     Group {
                         if let s = url, let u = URL(string: s) {
                             KFImage(u)
                                 .placeholder { Rectangle().fill(Palette.muted.opacity(0.15)) }
                                 .resizable()
-                                .scaledToFill()
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(Palette.card)
                         } else {
                             Rectangle().fill(Palette.muted.opacity(0.15))
                         }
                     }
-                    .frame(height: 460)
+                    .aspectRatio(3.0/4.0, contentMode: .fit)
                     .frame(maxWidth: .infinity)
                     .clipped()
                     if let sc = o.score, sc > 0 {

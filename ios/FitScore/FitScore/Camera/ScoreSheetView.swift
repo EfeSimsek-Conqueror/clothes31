@@ -115,7 +115,7 @@ struct ScoreSheetView: View {
                     tips: [
                         "Silhouette, palette, proportion…",
                         "Weighing fabric, fit, and mood.",
-                        "Hem is being brutally honest.",
+                        "Hem is being honest.",
                         "Cross-checking against your occasion.",
                     ]
                 )

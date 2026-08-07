@@ -11,13 +11,19 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Aug 2026: only one honesty tone shipped — honest/constructive. Kind + brutal
+// removed per product decision. Any legacy client request with honesty="kind"
+// or honesty="brutal" is silently coerced to "honest" (see resolveHonesty).
 const HONESTY_LINES: Record<string, string> = {
-  kind: "Be generous but specific. Never harsh.",
   honest:
-    "Be direct and specific. Praise real strengths, name real weaknesses.",
-  brutal:
-    "Roast the outfit like an editor with a deadline. Never insult the person — only the clothes. Every roast must end with a fix.",
+    "Be direct and specific. Praise real strengths, name real weaknesses. Always end with one concrete fix. Never insult the person — only the clothes.",
 };
+
+function resolveHonesty(input: unknown): string {
+  // Everything collapses to "honest" now. Keep the field on the request for
+  // backward compat with older iOS/Android builds still in the wild.
+  return "honest";
+}
 
 const MARKUP_TYPES = new Set(["arrow", "line", "focus", "swap"]);
 const FIT_COLS = 16;
@@ -156,8 +162,7 @@ Deno.serve(async (req: Request) => {
   const image_url = (body?.image_url ?? "").toString().trim();
   const back_url = (body?.back_url ?? "").toString().trim();
   const occasion = (body?.occasion ?? "everyday").toString().trim() || "everyday";
-  const honestyRaw = (body?.honesty ?? "honest").toString().trim().toLowerCase();
-  const honesty = HONESTY_LINES[honestyRaw] ? honestyRaw : "honest";
+  const honesty = resolveHonesty(body?.honesty);
   const intent = (body?.intent ?? "").toString().trim().slice(0, 300);
   const bodyProfile = body?.body_profile && typeof body.body_profile === "object"
     ? body.body_profile
