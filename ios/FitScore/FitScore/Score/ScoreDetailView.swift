@@ -19,6 +19,7 @@ struct ScoreDetailView: View {
     // outfit_studio_side sibling).
     @State private var sideUrl: String? = nil
     @State private var heroPagerIndex: Int = 0
+    @State private var reportTarget: ReportTarget? = nil
 
     var body: some View {
         GeometryReader { geo in
@@ -39,6 +40,9 @@ struct ScoreDetailView: View {
         }
         .background(Palette.paper.ignoresSafeArea())
         .task { await load() }
+        .sheet(item: $reportTarget) { t in
+            ReportContentSheet(target: t) { reportTarget = nil }
+        }
         .fullScreenCover(isPresented: $showXRay) {
             if let url = photoUrl {
                 ScoreAnnotationView(
@@ -194,6 +198,17 @@ struct ScoreDetailView: View {
                     }
                 }
             }
+            // This read was written by AI — let the wearer flag it here.
+            Button(action: { Haptic.tap(); reportTarget = ReportTarget(ReportKind.outfit, outfitId) }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "flag").font(.system(size: 11))
+                    Text("Report this critique").font(Serif.body(13))
+                }
+                .foregroundStyle(Palette.muted)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 12)
         }
         .padding(.horizontal, 20)
         .padding(.top, 20)

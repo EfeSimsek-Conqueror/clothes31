@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Top-of-funnel home feed. Loads profile, latest activity, hem note, weather,
+/// Top-of-funnel home feed. Loads profile, latest activity, hem note,
 /// recent outfits, sunday letter, and closet count in parallel — then composes
 /// the header + banners + LATEST card + Style challenge + Sunday letter +
 /// recents strip + best/journal 2-up row. Ports Android `HomeScreen`.
@@ -14,7 +14,6 @@ struct HomeView: View {
     @State private var displayName: String?
     @State private var email: String?
     @State private var hemNoteBody: String?
-    @State private var tempC: Int?
     @State private var loaded = false
     @State private var recentOutfits: [Outfit] = []
     @State private var recentUrls: [String: String] = [:]
@@ -97,7 +96,8 @@ struct HomeView: View {
     private var header: some View {
         HomeHeader(
             name: greetingName,
-            tempC: tempC,
+            // Weather removed Sep 2026 — see Util/Weather.swift. `nil` here is
+            // permanent; HomeHeader should drop the chip entirely.
             initial: String(greetingName.first.map(String.init)?.uppercased() ?? "•"),
             credits: credits.balance,
             onOpenCredits: { showCredits = true }
@@ -266,8 +266,6 @@ struct HomeView: View {
 
     @MainActor
     private func load() async {
-        async let weather: Int? = Weather.temperatureCelsius()
-
         let profile = try? await Repo.shared.currentProfile()
         displayName = profile?.display_name
         email = Repo.shared.userEmail
@@ -310,7 +308,6 @@ struct HomeView: View {
             firstRunDone = true
         }
 
-        tempC = await weather
         loaded = true
     }
 

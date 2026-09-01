@@ -40,11 +40,19 @@ struct MagazineCoverSheet: View {
     @State private var error: String?
     @State private var cover: ComposeCoverResponse?
 
+    // Likeness consent — asked once, then remembered. Gate sits in front of
+    // every compose, including the one launched from the Edit sheet.
+    @AppStorage("cover_likeness_ack_v1") private var likenessAcknowledged = false
+    @State private var showConsent = false
+    @State private var consentConfirmed = false
+    @State private var pendingCost = 0
+
     // Camera / picker
     @State private var showSubjectCamera = false
     @State private var subjectPicker: PhotosPickerItem?
     @State private var referencePicker: PhotosPickerItem?
     @State private var showMyCovers = false
+    @State private var reportTarget: ReportTarget? = nil
     @State private var savedTemplates: [MagazineCover] = []
 
     // Edit-cover fields
@@ -111,6 +119,9 @@ struct MagazineCoverSheet: View {
                 }
             }
         }
+        .sheet(item: $reportTarget) { t in
+            ReportContentSheet(target: t) { reportTarget = nil }
+        }
         .sheet(isPresented: $showMastheadEditor) {
             MastheadEditorSheet(masthead: $masthead) { showMastheadEditor = false }
                 .presentationDetents([.height(280)])
@@ -131,6 +142,21 @@ struct MagazineCoverSheet: View {
                 },
                 onClose: { showEdit = false }
             )
+        }
+        .sheet(isPresented: $showConsent, onDismiss: {
+            guard consentConfirmed else { return }
+            consentConfirmed = false
+            compose(cost: pendingCost)
+        }) {
+            LikenessConsentSheet(
+                onConfirm: {
+                    likenessAcknowledged = true
+                    consentConfirmed = true
+                    showConsent = false
+                },
+                onCancel: { showConsent = false }
+            )
+            .presentationDetents([.height(440)])
         }
     }
 
@@ -290,6 +316,10 @@ struct MagazineCoverSheet: View {
                     sourceChip(icon: "photo.on.rectangle", label: "Gallery")
                 }
             }
+            Text("You, or someone who said yes. No impersonating anyone.")
+                .font(Serif.italic(10))
+                .foregroundStyle(Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -297,7 +327,7 @@ struct MagazineCoverSheet: View {
 
     private var referenceTile: some View {
         VStack(alignment: .leading, spacing: 6) {
-            tileBox(image: referenceImage, placeholder: "Magazine cover to mimic", aspect: 3.0/4.0)
+            tileBox(image: referenceImage, placeholder: "A cover style to borrow", aspect: 3.0/4.0)
             HStack(spacing: 6) {
                 Text("REFERENCE (OPT)")
                     .font(.system(size: 9, weight: .semibold)).tracking(1.5)
@@ -462,6 +492,20 @@ struct MagazineCoverSheet: View {
             }
             Button(action: reset) { OutlinePillButton(title: "Try another") }
             Button(action: onClose) { OutlinePillButton(title: "Done") }
+            // The cover is AI-generated — reporting lives on the artifact itself.
+            Button(action: {
+                Haptic.tap()
+                reportTarget = ReportTarget(ReportKind.cover, cover.cover_id ?? outfitId ?? coverUrl)
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "flag").font(.system(size: 11))
+                    Text("Report this cover").font(Serif.body(13))
+                }
+                .foregroundStyle(Palette.muted)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
         }
     }
 
@@ -489,6 +533,14 @@ struct MagazineCoverSheet: View {
 
     private func compose(cost: Int) {
         guard subjectImage != nil else { return }
+        guard likenessAcknowledged else {
+            pendingCost = cost
+            // Compose can be fired straight from the Edit cover, so give a
+            // dismissing presentation a beat before we put the gate up —
+            // back-to-back presentations get dropped.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { showConsent = true }
+            return
+        }
         busy = true
         error = nil
         Task {
@@ -536,6 +588,9 @@ struct MagazineCoverSheet: View {
                         }
                         if err == "swap_failed" {
                             return "Couldn't compose the swap — try a clearer subject photo or a different reference."
+                        }
+                        if err.contains("text_rejected") {
+                            return "Cover text can't include profanity or slurs. Edit the wording and try again."
                         }
                         return err
                     }()
@@ -638,6 +693,66 @@ private struct MyCoversPicker: View {
                         .foregroundStyle(Palette.bronze)
                 }
             }
+        }
+    }
+}
+
+// MARK: - Likeness consent
+
+/// One-time gate in front of the first cover compose. The composer transplants
+/// a face onto a cover, so the rule that only your own likeness (or a likeness
+/// you have permission to use) may go on it has to live here, at the upload,
+/// not buried in the terms on the website. Acknowledgement is remembered.
+private struct LikenessConsentSheet: View {
+    var onConfirm: () -> Void
+    var onCancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Eyebrow(text: "BEFORE WE PRINT")
+                Spacer()
+                Button(action: onCancel) { Image(systemName: "xmark").foregroundStyle(Palette.ink) }
+            }
+            Text("Whose face is this?")
+                .font(Serif.display(24))
+                .foregroundStyle(Palette.ink)
+            Text("The composer puts the person in your photo on the cover. Two rules before you do that.")
+                .font(Serif.italic(14))
+                .foregroundStyle(Palette.muted)
+
+            VStack(alignment: .leading, spacing: 10) {
+                rule("the person in the photo is you, or has agreed to being on it")
+                rule("you won't use the cover to impersonate anyone, or to suggest they endorsed something")
+            }
+            .padding(.top, 2)
+
+            Text("No public figures, no photos of people who didn't say yes. Covers that break this get removed.")
+                .font(Serif.italic(12))
+                .foregroundStyle(Palette.muted)
+
+            Spacer()
+
+            HStack(spacing: 8) {
+                Button(action: onCancel) { OutlinePillButton(title: "Not now") }
+                PrimaryButton(title: "I confirm", enabled: true, action: onConfirm)
+            }
+        }
+        .padding(20)
+        .background(Palette.paper.ignoresSafeArea())
+    }
+
+    private func rule(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Circle()
+                .fill(Palette.bronze)
+                .frame(width: 5, height: 5)
+                .padding(.top, 7)
+            Text(text)
+                .font(Serif.body(14))
+                .foregroundStyle(Palette.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
     }
 }

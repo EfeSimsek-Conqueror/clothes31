@@ -3,18 +3,18 @@ import SwiftUI
 // MARK: - Vocabulary (mirrors the Studio piece wizard's data-driven step defs)
 
 private let COVER_GENRES: [(String, String)] = [
-    ("Fashion",    "Vogue-adjacent editorial, sharp typography, restrained styling."),
-    ("Streetwear", "Off-White / Hypebeast energy, casual grit, oversized text."),
-    ("Sport",      "SI-style, dynamic, high contrast, muscular type."),
-    ("Culture",    "Dazed / i-D voice — experimental, provocative, playful."),
-    ("Lifestyle",  "Kinfolk / Cereal — slow, quiet, hairline detail."),
-    ("Music",      "Rolling Stone / The Face — moody, portraiture-forward."),
-    ("Art",        "Whitewall / gallery print — clean, generous whitespace."),
-    ("Business",   "Fortune / Wallpaper — architectural, condensed sans."),
+    ("Fashion",    "High-fashion editorial, sharp typography, restrained styling."),
+    ("Streetwear", "Drop-culture energy, casual grit, oversized text."),
+    ("Sport",      "Sports-desk, dynamic, high contrast, muscular type."),
+    ("Culture",    "Youth-culture voice — experimental, provocative, playful."),
+    ("Lifestyle",  "Slow-living quarterly — quiet, hairline detail."),
+    ("Music",      "Music press — moody, portraiture-forward."),
+    ("Art",        "Gallery print — clean, generous whitespace."),
+    ("Business",   "Design-and-business quarterly — architectural, condensed sans."),
 ]
 
 private let COVER_MOODS: [(String, String)] = [
-    ("Editorial",    "Classic Vogue: bold serif, tight columns, moody grade."),
+    ("Editorial",    "Classic fashion book: bold serif, tight columns, moody grade."),
     ("Quiet luxury", "Understated, cream backgrounds, generous whitespace."),
     ("Brutalist",    "Hard bars, condensed sans, high-contrast ink."),
     ("Romantic",     "Italic display, blush palette, cursive touches."),
@@ -36,7 +36,7 @@ private let COVER_COLORS: [(String, String, String)] = [
     ("Bronze",      "#B4813E", "Warm accent — Fitrater signature."),
     ("Bone",        "#EAE3D3", "Softer than cream, gallery-like."),
     ("Slate",       "#3E4552", "Muted, corporate, considered."),
-    ("Terracotta",  "#B4573E", "Warm clay — Kinfolk-esque."),
+    ("Terracotta",  "#B4573E", "Warm clay — slow-living quarterly."),
     ("Sage",        "#7F8D6E", "Botanical, calm, quiet luxury."),
     ("Blush",       "#E9C7BF", "Romantic, soft focus."),
 ]
@@ -61,7 +61,7 @@ private let POSES: [(String, String, String)] = [
     ("standing",           "Standing",   "Full-length, editorial front pose."),
     ("seated",             "Seated",     "On a chair or floor — considered, intimate."),
     ("walking",            "Walking",    "Motion, streetstyle-adjacent."),
-    ("editorial_portrait", "Portrait",   "Bust / face-forward — the classic Vogue shot."),
+    ("editorial_portrait", "Portrait",   "Bust / face-forward — the classic cover shot."),
     ("detail",             "Detail",     "Close-up on fabric, hands, or accessory."),
 ]
 
@@ -333,7 +333,10 @@ struct CoverTemplateCreatorView: View {
                     includeBarcode: true
                 )
                 if let err = resp.error {
-                    throw NSError(domain: "Template", code: 1, userInfo: [NSLocalizedDescriptionKey: err])
+                    let msg = err.contains("text_rejected")
+                        ? "Cover text can't include profanity or slurs. Edit the wording and try again."
+                        : err
+                    throw NSError(domain: "Template", code: 1, userInfo: [NSLocalizedDescriptionKey: msg])
                 }
                 try? await Repo.shared.spendCredits(amount: Supa.coverTemplateCost, kind: "cover_template")
                 Haptic.soft()
@@ -471,7 +474,7 @@ private struct Step5CoverLines: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Add cover lines.")
                 .font(Serif.display(22)).foregroundStyle(Palette.ink)
-            Text("The little tag lines scattered around the model on real Vogue covers. Up to 4. Skip if you want it clean.")
+            Text("The little tag lines scattered around the model on a fashion cover. Up to 4. Skip if you want it clean.")
                 .font(Serif.italic(14)).foregroundStyle(Palette.muted)
 
             // Existing lines

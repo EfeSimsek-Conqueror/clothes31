@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// create-cover-template v4: Vogue-like magazine cover mockup for Fitrater.
+// create-cover-template v4: high-fashion editorial cover mockup for Fitrater.
 //
 // v3 was DOA on two fronts:
 //   (a) Fal `flux/schnell` produced abstract color bands, not a person.
@@ -49,6 +49,119 @@ function weekOfYear(d: Date): number {
   target.setUTCDate(target.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
   return Math.ceil(((target.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+// -------------------------- Prohibited user text --------------------------
+//
+// Screens text the USER typed in the cover wizard — masthead, headline,
+// pull-quote, cover lines — because all of it is burned onto an image the
+// user then shares. Profanity and slurs are rejected outright.
+// Kept byte-identical to the copy in `compose-cover` (edge functions here
+// have no shared module); change both together.
+
+// Matched as whole words (after normalisation).
+const PROFANITY_WORDS = [
+  "fuck", "fucks", "fucked", "fucking", "fucker", "fuckers", "motherfucker",
+  "shit", "shits", "shitty", "bullshit", "shithead",
+  "bitch", "bitches", "cunt", "cunts", "asshole", "assholes", "arsehole",
+  "bastard", "dickhead", "prick", "wanker", "twat", "whore", "slut", "sluts",
+  "cock", "dick", "dicks", "pussy", "penis", "vagina", "clit", "nipples",
+  "tits", "titties", "boobs", "cum", "jizz", "blowjob", "handjob", "rimjob",
+  "gangbang", "bukkake", "creampie", "deepthroat", "dildo", "buttplug",
+  "porn", "porno", "pornhub", "hentai", "milf", "nudes", "nsfw",
+  "rape", "raped", "rapist", "molest", "molester", "incest", "bestiality",
+  "zoophilia", "necrophilia", "pedo", "pedophile", "paedophile", "loli",
+  "shota", "childporn",
+  "dyke", "fag", "fags", "tranny", "trannies", "shemale",
+  "coon", "darkie", "jigaboo", "spic", "gook", "kike", "yid", "beaner",
+  "wetback", "paki", "abbo", "zipperhead",
+  "nazi", "nazis", "kkk", "heil",
+];
+
+// Matched anywhere inside a word — unambiguous slurs where padding, plurals,
+// or glued characters are the whole point of the evasion.
+const SLUR_FRAGMENTS = [
+  "nigger", "nigga", "faggot", "chink", "towelhead", "raghead", "retard",
+  "sandnigger", "hitler",
+];
+
+// Multi-word phrases, matched against the normalised string.
+const HATE_PHRASES = [
+  "heil hitler", "sieg heil", "white power", "gas the", "kill all",
+  "death to all",
+];
+
+/// Lowercase, strip accents, undo common leetspeak, and reduce every
+/// non-letter to a space so "f.u.c.k", "f-u-c-k" and "F U C K" all collapse
+/// to the same token stream.
+function normalizeForMatch(raw: string): string {
+  return raw
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[0@]/g, "o")
+    .replace(/[1!|]/g, "i")
+    .replace(/3/g, "e")
+    .replace(/4/g, "a")
+    .replace(/[5$]/g, "s")
+    .replace(/7/g, "t")
+    .replace(/[^a-z]+/g, " ")
+    .trim();
+}
+
+/// Glue runs of single letters back together ("f u c k" -> "fuck") so
+/// letter-spaced evasion is caught.
+function mergeSingleLetterRuns(tokens: string[]): string[] {
+  const out: string[] = [];
+  let run: string[] = [];
+  const flush = () => { if (run.length > 1) out.push(run.join("")); run = []; };
+  for (const t of tokens) {
+    if (t.length === 1) { run.push(t); continue; }
+    flush();
+    out.push(t);
+  }
+  flush();
+  return out;
+}
+
+/// Collapse repeated letters ("fuuuck" -> "fuck") for a second pass.
+function collapseRepeats(word: string): string {
+  return word.replace(/(.)\1+/g, "$1");
+}
+
+/// Returns the offending term, or null when the text is clean.
+/// Empty / missing input is always clean.
+function findProhibitedTerm(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const norm = normalizeForMatch(raw);
+  if (!norm) return null;
+
+  for (const phrase of HATE_PHRASES) {
+    if (norm.includes(phrase)) return phrase;
+  }
+
+  const tokens = mergeSingleLetterRuns(norm.split(" ").filter(Boolean));
+  for (const token of tokens) {
+    for (const frag of SLUR_FRAGMENTS) {
+      if (token.includes(frag) || collapseRepeats(token).includes(frag)) return frag;
+    }
+    const squeezed = collapseRepeats(token);
+    for (const word of PROFANITY_WORDS) {
+      if (token === word || squeezed === word || squeezed === collapseRepeats(word)) {
+        return word;
+      }
+    }
+  }
+  return null;
+}
+
+/// Screens every user-typed string that ends up rendered on the cover.
+function findProhibitedInAny(values: Array<string | null | undefined>): string | null {
+  for (const v of values) {
+    const hit = findProhibitedTerm(v);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 function sanitizeHeadline(raw: string): string {
@@ -286,7 +399,7 @@ async function generateSubjectImage(
     `${moodText} magazine aesthetic. ${spec.photoStyle}. ` +
     `Shot on medium-format film, cinematic dramatic lighting, ` +
     `sharp focus on the model, shallow depth of field. ` +
-    `Vogue-style cover photography, 9:16 portrait crop, hyperrealistic, ` +
+    `High-fashion editorial cover photography, 9:16 portrait crop, hyperrealistic, ` +
     `professional fashion editorial. No text, no logos, no watermarks, ` +
     `no borders, no color blocks.`;
 
@@ -722,6 +835,24 @@ Deno.serve(async (req: Request) => {
 
   const rawHeadline = body?.headline ? String(body.headline).trim() : "";
   if (!rawHeadline) return json(400, { error: "missing_headline" });
+
+  // Safety: reject profanity / slurs in anything the user typed before we
+  // render it onto a shareable image.
+  const prohibited = findProhibitedInAny([
+    body?.headline ? String(body.headline) : null,
+    body?.pull_quote ? String(body.pull_quote) : null,
+    body?.masthead ? String(body.masthead) : null,
+    ...(Array.isArray(body?.cover_lines)
+      ? (body.cover_lines.filter((x: unknown) => typeof x === "string") as string[])
+      : []),
+  ]);
+  if (prohibited) {
+    console.log("template_text_rejected", JSON.stringify({ term: prohibited }));
+    return json(400, {
+      error: "text_rejected",
+      detail: "Cover text can't include profanity or slurs. Edit the wording and try again.",
+    });
+  }
 
   const headline = sanitizeHeadline(rawHeadline);
   if (!headline) return json(400, { error: "invalid_headline" });

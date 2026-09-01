@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { clsx } from "clsx";
 
-const modes = ["Kind", "Honest", "Brutal"] as const;
+const modes = ["Kind", "Honest"] as const;
 
 export function HonestyDial() {
   const [mode, setMode] = useState<(typeof modes)[number]>("Honest");

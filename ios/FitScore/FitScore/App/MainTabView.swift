@@ -63,9 +63,6 @@ struct MainTabView: View {
             case .versus:
                 VersusView(onClose: { cameraBus.pending = nil },
                            onOpenPaywall: { cameraBus.request(.paywall, context: nil) })
-            case .roast:
-                RoastView(onClose: { cameraBus.pending = nil },
-                          onOpenPaywall: { cameraBus.request(.paywall, context: .brutal) })
             case .decode:
                 DecodeView(onClose: { cameraBus.pending = nil },
                            onOpenPaywall: { cameraBus.request(.paywall, context: nil) })
@@ -158,7 +155,6 @@ struct StylistMessage: Identifiable, Equatable {
 enum ChatChip: String, Identifiable, CaseIterable {
     case tryon = "🪞 Try it on"
     case alternates = "🔁 3 alternatives"
-    case save = "📌 Save this"
     var id: String { rawValue }
 }
 
@@ -179,6 +175,10 @@ final class StylistChatViewModel: ObservableObject {
         ))
     }
 
+    /// The last request that failed, kept so the error banner's Retry can
+    /// re-send it without the user retyping anything.
+    private var failedRequest: (history: [StylistApi.Msg], imageData: Data?)? = nil
+
     func send() async {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty || pickedImage != nil else { return }
@@ -188,19 +188,33 @@ final class StylistChatViewModel: ObservableObject {
         input = ""
         pickedImage = nil
         pickedImageData = nil
+
+        let history: [StylistApi.Msg] = messages
+            .suffix(20)
+            .map { StylistApi.Msg(role: $0.role.rawValue, content: $0.text) }
+        await deliver(history: history, imageData: imageData)
+    }
+
+    /// Re-sends the last request that failed. No-op when nothing is pending.
+    func retry() async {
+        guard let request = failedRequest else { return }
+        failedRequest = nil
+        await deliver(history: request.history, imageData: request.imageData)
+    }
+
+    /// Sends one turn to the backend. On failure the streaming placeholder is
+    /// removed — the transcript never shows a reply Hem didn't actually give —
+    /// and `error` drives the banner with Retry.
+    private func deliver(history: [StylistApi.Msg], imageData: Data?) async {
         busy = true
         error = nil
 
         // Placeholder assistant message we'll fill in.
-        var placeholder = StylistMessage(role: .assistant, text: "", isStreaming: true)
+        let placeholder = StylistMessage(role: .assistant, text: "", isStreaming: true)
         messages.append(placeholder)
         let placeholderId = placeholder.id
 
         do {
-            let history: [StylistApi.Msg] = messages
-                .dropLast() // drop the streaming placeholder
-                .suffix(20)
-                .map { StylistApi.Msg(role: $0.role.rawValue, content: $0.text) }
             let reply = try await StylistApi.send(history: history, imageData: imageData)
             if let idx = messages.firstIndex(where: { $0.id == placeholderId }) {
                 messages[idx].text = reply
@@ -209,14 +223,21 @@ final class StylistChatViewModel: ObservableObject {
                 messages[idx].chips = deriveChips(for: reply)
             }
         } catch {
-            let msg = "Couldn't reach Hem right now. \(error.localizedDescription)"
-            if let idx = messages.firstIndex(where: { $0.id == placeholderId }) {
-                messages[idx].text = msg
-                messages[idx].isStreaming = false
-            }
-            self.error = msg
+            messages.removeAll { $0.id == placeholderId }
+            self.error = "Couldn't reach Hem right now. \(error.localizedDescription)"
+            failedRequest = (history, imageData)
         }
         busy = false
+    }
+
+    /// Injects a follow-up prompt as if the user had typed it. Used by the
+    /// suggestion chips under an assistant reply.
+    func ask(_ prompt: String) async {
+        guard !busy else { return }
+        input = prompt
+        pickedImage = nil
+        pickedImageData = nil
+        await send()
     }
 
     private func deriveChips(for reply: String) -> [ChatChip] {
@@ -226,14 +247,14 @@ final class StylistChatViewModel: ObservableObject {
             chips.append(.tryon)
             chips.append(.alternates)
         }
-        chips.append(.save)
         return chips
     }
 }
 
-/// Thin service around the `stylist-chat` edge function. Falls back to a canned
-/// reply when the function is missing (dev), so the UI is testable end-to-end
-/// without the backend deployed yet.
+/// Thin service around the `stylist-chat` edge function. In DEBUG only it falls
+/// back to a canned reply so the UI is testable without the backend deployed;
+/// Release builds always surface the real failure — a shipped build must never
+/// present invented advice as a genuine answer.
 enum StylistApi {
     struct Msg: Codable { let role: String; let content: String }
     struct Payload: Encodable {
@@ -256,12 +277,18 @@ enum StylistApi {
             if let err = r.error { throw NSError(domain: "stylist-chat", code: 1, userInfo: [NSLocalizedDescriptionKey: err]) }
             throw NSError(domain: "stylist-chat", code: 2, userInfo: [NSLocalizedDescriptionKey: "empty reply"])
         } catch {
-            // Fallback so the UI works before the edge function is deployed.
+            #if DEBUG
+            // Dev-only fallback so the UI works before the edge function is
+            // deployed. Never compiled into Release.
             let last = history.last?.content ?? ""
             return canned(for: last)
+            #else
+            throw error
+            #endif
         }
     }
 
+    #if DEBUG
     private static func canned(for prompt: String) -> String {
         let p = prompt.lowercased()
         if p.contains("wedding") || p.contains("düğün") {
@@ -272,6 +299,7 @@ enum StylistApi {
         }
         return "Got you. Send a photo of what you're considering and I'll call the proportions and colour honestly."
     }
+    #endif
 }
 
 /// Chat screen — presented as fullScreenCover from CameraMenuBus.request(.chat).
@@ -280,6 +308,7 @@ struct StylistChatView: View {
 
     @StateObject private var vm = StylistChatViewModel()
     @State private var pickerItem: PhotosPickerItem? = nil
+    @State private var reportTarget: ReportTarget? = nil
     @FocusState private var inputFocused: Bool
 
     var body: some View {
@@ -289,6 +318,7 @@ struct StylistChatView: View {
                 header
                 Hairline()
                 transcript
+                errorBanner
                 Hairline()
                 composer
             }
@@ -301,6 +331,9 @@ struct StylistChatView: View {
                     vm.pickedImage = UIImage(data: processed)
                 }
             }
+        }
+        .sheet(item: $reportTarget) { t in
+            ReportContentSheet(target: t) { reportTarget = nil }
         }
     }
 
@@ -336,8 +369,20 @@ struct StylistChatView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     ForEach(vm.messages) { msg in
-                        MessageBubble(msg: msg)
-                            .id(msg.id)
+                        Group {
+                            if msg.role == .assistant, !msg.text.isEmpty {
+                                // Long-press to report an AI reply, on the artifact itself.
+                                MessageBubble(msg: msg, onChip: handleChip)
+                                    .contextMenu {
+                                        Button("Report this reply", systemImage: "flag") {
+                                            reportTarget = ReportTarget(ReportKind.chatMessage, msg.id.uuidString)
+                                        }
+                                    }
+                            } else {
+                                MessageBubble(msg: msg, onChip: handleChip)
+                            }
+                        }
+                        .id(msg.id)
                     }
                     if vm.busy {
                         HStack(spacing: 6) {
@@ -359,6 +404,63 @@ struct StylistChatView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: error
+
+    /// Shown when a turn failed. The transcript keeps no invented reply, so this
+    /// banner and its Retry are the only recovery path.
+    @ViewBuilder
+    private var errorBanner: some View {
+        if let err = vm.error {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Palette.roastRed)
+                Text(err)
+                    .font(Serif.body(13))
+                    .foregroundStyle(Palette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Button(action: {
+                    Haptic.tap()
+                    Task { await vm.retry() }
+                }) {
+                    Text("RETRY")
+                        .font(.system(size: 11, weight: .semibold))
+                        .tracking(1.2)
+                        .foregroundStyle(Palette.ink)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .overlay(Capsule().stroke(Palette.ink, lineWidth: 1))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(vm.busy)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Palette.card)
+        }
+    }
+
+    // MARK: chips
+
+    /// Suggestion chips under an assistant reply. Every chip does real work —
+    /// nothing here is decorative.
+    private func handleChip(_ chip: ChatChip) {
+        Haptic.chip()
+        switch chip {
+        case .tryon:
+            let ctx = FeatureGates.requireTryon()
+            onClose()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                if let ctx { CameraMenuBus.shared.request(.paywall, context: ctx) }
+                else { CameraMenuBus.shared.request(.tryon) }
+            }
+        case .alternates:
+            Task { await vm.ask("Give me 3 alternatives to that — numbered, one line each.") }
         }
     }
 
@@ -429,6 +531,7 @@ struct StylistChatView: View {
 
 private struct MessageBubble: View {
     let msg: StylistMessage
+    var onChip: (ChatChip) -> Void
 
     var body: some View {
         HStack(alignment: .top) {
@@ -453,15 +556,18 @@ private struct MessageBubble: View {
                 if msg.role == .assistant, !msg.chips.isEmpty {
                     HStack(spacing: 6) {
                         ForEach(msg.chips) { chip in
-                            Text(chip.rawValue)
-                                .font(.system(size: 11, weight: .semibold))
-                                .tracking(0.5)
-                                .foregroundStyle(Palette.ink)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Palette.card)
-                                .overlay(Capsule().stroke(Palette.hairline, lineWidth: 1))
-                                .clipShape(Capsule())
+                            Button(action: { onChip(chip) }) {
+                                Text(chip.rawValue)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .tracking(0.5)
+                                    .foregroundStyle(Palette.ink)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(Palette.card)
+                                    .overlay(Capsule().stroke(Palette.hairline, lineWidth: 1))
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }

@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// Top row on Home: date eyebrow + serif greeting on the left; weather circle
-/// + avatar circle with credits label on the right. Ports Android `HomeHeader`.
+/// Top row on Home: date eyebrow + serif greeting on the left; avatar circle
+/// with credits label on the right. Ports Android `HomeHeader`.
 struct HomeHeader: View {
     let name: String
-    let tempC: Int?
     let initial: String
     let credits: Int?
     var onOpenCredits: () -> Void = {}
@@ -22,7 +21,6 @@ struct HomeHeader: View {
             }
             Spacer(minLength: 12)
             HStack(alignment: .top, spacing: 6) {
-                CircleToken(text: tempC.map { "\($0)°" } ?? "--°")
                 VStack(spacing: 4) {
                     Button(action: {
                         Haptic.chip()

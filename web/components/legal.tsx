@@ -15,12 +15,13 @@ export function LegalShell({
 
       <header className="relative z-10 mx-auto max-w-3xl px-6 pt-6 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
-          <span className="serif text-xl">FitScore</span>
+          <span className="serif text-xl">Fitrater</span>
           <span className="text-[0.6rem] uppercase tracking-[0.24em] text-bronze">
             / Hem
           </span>
         </Link>
         <nav className="flex items-center gap-6 text-sm text-muted">
+          <Link href="/support" className="hover:text-ink">Support</Link>
           <Link href="/privacy" className="hover:text-ink">Privacy</Link>
           <Link href="/terms" className="hover:text-ink">Terms</Link>
         </nav>

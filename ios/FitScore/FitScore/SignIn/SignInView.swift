@@ -17,6 +17,7 @@ struct SignInView: View {
     @State private var password = ""
     @State private var passwordSubmitting = false
     @State private var showPasswordField = false
+    @State private var legalURL: URL?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -110,10 +111,36 @@ struct SignInView: View {
                     .font(Serif.body(14))
                     .foregroundStyle(Palette.muted)
                 }
+
+                legalFooter
             }
             .padding(.bottom, 32)
         }
         .padding(.horizontal, 24)
+        .sheet(item: Binding(get: { legalURL.map { LegalURL(url: $0) } }, set: { _ in legalURL = nil })) { holder in
+            SafariView(url: holder.url)
+        }
+    }
+
+    /// Compact legal footer. Sign-in is the last screen before body calibration
+    /// uploads a full-body photo to a third-party model, so Terms + Privacy have
+    /// to be one tap away here — not buried in You → Help.
+    private var legalFooter: some View {
+        VStack(spacing: 6) {
+            Text("By continuing you agree to our")
+                .font(Serif.body(12))
+                .foregroundStyle(Palette.muted)
+            HStack(spacing: 16) {
+                Button("Terms of Use") { legalURL = URL(string: "https://fitrater.ai/terms") }
+                Button("Privacy Policy") { legalURL = URL(string: "https://fitrater.ai/privacy") }
+            }
+            .buttonStyle(.plain)
+            .font(Serif.body(12, weight: .semibold))
+            .underline()
+            .foregroundStyle(Palette.ink)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
     }
 
     private func sendLink() {
@@ -164,3 +191,7 @@ struct SignInView: View {
         return vc
     }
 }
+
+/// Sheet identity for the legal links above. `SafariView` (HelpPrivacySheet.swift)
+/// is the app-wide SFSafariViewController wrapper.
+private struct LegalURL: Identifiable { let id = UUID(); let url: URL }

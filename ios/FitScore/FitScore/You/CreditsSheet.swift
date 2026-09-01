@@ -1,5 +1,6 @@
 import SwiftUI
 import RevenueCat
+import StoreKit
 
 /// Full-screen paywall sheet — credits packs + Pro plans.
 struct CreditsSheet: View {
@@ -14,7 +15,6 @@ struct CreditsSheet: View {
     @State private var loading = true
     @State private var processing: String? = nil
     @State private var restoring = false
-    @State private var debugMsg: String = ""
 
     private var offering: Offering? { billing.offerings?.current }
     private var isPro: Bool { billing.isPro }
@@ -137,13 +137,10 @@ struct CreditsSheet: View {
                     enabled: processing == nil && pkg != nil,
                     comingSoon: false
                 ) {
-                    let n = offering?.availablePackages.count ?? -1
-                    let ids = offering?.availablePackages.map { $0.storeProduct.productIdentifier }.joined(separator: ",") ?? "nil"
-                    debugMsg = "tap[\(spec.id)] pkg=\(pkg == nil ? "NIL" : "OK") · offer=\(n) ids=\(ids)"
                     if let pkg {
                         Task { await purchase(pkg, grantId: spec.id, credits: spec.credits) }
                     } else {
-                        Task { await retryOffering() }
+                        Task { await retryOffering(); toasts.post("Store still syncing — try again in a minute.") }
                     }
                 }
             }
@@ -156,12 +153,14 @@ struct CreditsSheet: View {
             Text("Get monthly refill credits + Pro perks.")
                 .font(Serif.body(14)).foregroundStyle(Palette.muted)
             HStack(spacing: 8) {
-                PlanTile(label: "Monthly", subline: "1,200 credits / month", price: monthlyPrice, popular: true,
+                PlanTile(label: "Monthly", subline: "1,200 credits / month", trial: introPhrase(for: monthlyPackage),
+                         price: monthlyPrice, popular: true,
                          busy: processing == "monthly", enabled: processing == nil && monthlyPackage != nil, comingSoon: false) {
                     if let pkg = monthlyPackage { Task { await purchase(pkg, grantId: "monthly", credits: 0) } }
                     else { Task { await retryOffering(); toasts.post("Store still syncing — try again in a minute.") } }
                 }
-                PlanTile(label: "Annual", subline: "750 credits / mo · 7-day trial", price: annualPrice, popular: false,
+                PlanTile(label: "Annual", subline: "750 credits / mo", trial: introPhrase(for: annualPackage),
+                         price: annualPrice, popular: false,
                          busy: processing == "annual", enabled: processing == nil && annualPackage != nil, comingSoon: false) {
                     if let pkg = annualPackage { Task { await purchase(pkg, grantId: "annual", credits: 0) } }
                     else { Task { await retryOffering(); toasts.post("Store still syncing — try again in a minute.") } }
@@ -181,14 +180,65 @@ struct CreditsSheet: View {
         // Only show when at least one plan is available (Apple requires it near the price/CTA).
         guard monthlyPackage != nil || annualPackage != nil else { return nil }
         var lines: [String] = []
-        if let a = annualPackage {
-            lines.append("Annual: 7-day free trial, then \(a.storeProduct.localizedPriceString) per year.")
-        }
-        if let m = monthlyPackage {
-            lines.append("Monthly: \(m.storeProduct.localizedPriceString) per month.")
-        }
+        // Monthly first — it is the emphasized default tile.
+        if let m = monthlyPackage { lines.append(disclosureLine("Monthly", m)) }
+        if let a = annualPackage { lines.append(disclosureLine("Annual", a)) }
         lines.append("Auto-renews until cancelled. Cancel anytime in Settings → Apple ID → Subscriptions.")
         return lines.joined(separator: " ")
+    }
+
+    /// One plan's terms, every word of it read off the real StoreKit product —
+    /// intro offer included, or silently omitted when the product has none.
+    private func disclosureLine(_ label: String, _ pkg: Package) -> String {
+        let price = pkg.storeProduct.localizedPriceString
+        let cadence = renewalNoun(pkg.storeProduct.subscriptionPeriod)
+        let tail = cadence.map { "\(price) \($0)" } ?? price
+        if let intro = introPhrase(for: pkg) {
+            return "\(label): \(intro), then \(tail)."
+        }
+        return "\(label): \(tail)."
+    }
+
+    // MARK: - Intro-offer copy (never hardcoded — always the product's own offer)
+
+    /// The product's introductory offer in words, or nil when there is no offer.
+    /// Derived from `introductoryDiscount` so the claim can never drift from
+    /// what App Store Connect actually charges.
+    private func introPhrase(for pkg: Package?) -> String? {
+        guard let offer = pkg?.storeProduct.introductoryDiscount else { return nil }
+        let units = offer.subscriptionPeriod.value
+        let one = unitNoun(offer.subscriptionPeriod.unit, plural: false)
+        switch offer.paymentMode {
+        case .freeTrial:
+            return "\(units)-\(one) free trial"
+        case .payUpFront:
+            let total = units * max(1, offer.numberOfPeriods)
+            return "\(total) \(unitNoun(offer.subscriptionPeriod.unit, plural: total != 1)) for \(offer.localizedPriceString)"
+        case .payAsYouGo:
+            let count = max(1, offer.numberOfPeriods)
+            return "\(offer.localizedPriceString) per \(one) for \(count) \(unitNoun(offer.subscriptionPeriod.unit, plural: count != 1))"
+        @unknown default:
+            return nil
+        }
+    }
+
+    /// "per month" / "every 3 months" — the renewal cadence in words.
+    private func renewalNoun(_ period: RevenueCat.SubscriptionPeriod?) -> String? {
+        guard let period else { return nil }
+        if period.value == 1 { return "per \(unitNoun(period.unit, plural: false))" }
+        return "every \(period.value) \(unitNoun(period.unit, plural: true))"
+    }
+
+    private func unitNoun(_ unit: RevenueCat.SubscriptionPeriod.Unit, plural: Bool) -> String {
+        let noun: String
+        switch unit {
+        case .day: noun = "day"
+        case .week: noun = "week"
+        case .month: noun = "month"
+        case .year: noun = "year"
+        @unknown default: noun = "period"
+        }
+        return plural ? noun + "s" : noun
     }
 
     private var legalLinks: some View {
@@ -227,43 +277,19 @@ struct CreditsSheet: View {
     private func load() async {
         await CreditsBus.shared.refresh()
         await billing.refresh()
-        // Show what RC actually returned so we can diagnose "no prices".
-        do {
-            let off = try await Purchases.shared.offerings()
-            let cur = off.current
-            let ids = cur?.availablePackages.map { $0.storeProduct.productIdentifier }.joined(separator: ",") ?? "nil"
-            let n = cur?.availablePackages.count ?? 0
-            debugMsg = "offering=\(cur?.identifier ?? "NIL") n=\(n) ids=[\(ids)]"
-        } catch {
-            debugMsg = "offerings error: \(error.localizedDescription)"
-        }
         loading = false
     }
 
     private func retryOffering() async {
-        debugMsg = "retry: fetching offerings…"
-        do {
-            let off = try await Purchases.shared.offerings()
-            let n = off.current?.availablePackages.count ?? -1
-            let ids = off.current?.availablePackages.map { $0.storeProduct.productIdentifier }.joined(separator: ",") ?? "nil"
-            debugMsg = "retry: current=\(off.current?.identifier ?? "NIL") n=\(n) ids=\(ids)"
-            await billing.refresh()
-        } catch {
-            debugMsg = "retry error: \(error.localizedDescription)"
-        }
+        await billing.refresh()
     }
 
     private func purchase(_ pkg: Package, grantId: String, credits: Int) async {
         processing = grantId
         defer { processing = nil }
-        debugMsg = "purchase start: \(pkg.storeProduct.productIdentifier)"
         do {
             let result = try await billing.purchase(package: pkg)
-            debugMsg = "purchase result: cancelled=\(result.userCancelled)"
-            if result.userCancelled {
-                toasts.post("Purchase canceled.")
-                return
-            }
+            if result.userCancelled { return }
             Haptic.tap()
             if credits > 0 {
                 // Grant server-side credits, keyed by the store transaction id
@@ -281,8 +307,21 @@ struct CreditsSheet: View {
             try? await Repo.shared.markPaywallShown()
             closeSheet()
         } catch {
-            debugMsg = "purchase error: \(error.localizedDescription)"
+            // A tap on Cancel is not a failure — say nothing. Anything else
+            // the shopper needs to hear about, or the sheet just sits there.
+            if Self.isCancellation(error) { return }
+            toasts.post("Purchase failed — \(error.localizedDescription)")
         }
+    }
+
+    /// True when the shopper dismissed the App Store sheet themselves.
+    private static func isCancellation(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if ns.domain == ErrorCode.errorDomain,
+           ns.code == ErrorCode.purchaseCancelledError.rawValue { return true }
+        if ns.domain == SKErrorDomain,
+           ns.code == SKError.Code.paymentCancelled.rawValue { return true }
+        return false
     }
 
     private var restoreLink: some View {
@@ -369,6 +408,8 @@ private struct PackCard: View {
 private struct PlanTile: View {
     let label: String
     let subline: String
+    /// Intro-offer terms for this exact product, or nil when it has none.
+    var trial: String? = nil
     let price: String
     let popular: Bool
     let busy: Bool
@@ -380,6 +421,12 @@ private struct PlanTile: View {
             VStack(spacing: 4) {
                 Text(label).font(Serif.body(15, weight: .semibold)).foregroundStyle(Palette.ink)
                 Text(subline).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                if let trial {
+                    Text(trial)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Palette.bronze)
+                        .multilineTextAlignment(.center)
+                }
                 Text(busy ? "Processing…" : price).font(Serif.body(14, weight: .semibold)).foregroundStyle(Palette.ink)
             }
             .frame(maxWidth: .infinity)

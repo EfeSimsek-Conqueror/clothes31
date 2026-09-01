@@ -87,12 +87,6 @@ struct FitHotspot: Codable, Hashable, Sendable {
 }
 
 /// Response from `transcribe-intent` — Fal wizper output.
-struct TranscribeResponse: Codable, Hashable, Sendable {
-    var transcript: String?
-    var sanitized: String?
-    var engine: String?
-    var error: String?
-}
 
 /// Convenience payload for the Studio intent box — bundles the sanitized
 /// transcript with the raw audio path for later replay/edit.

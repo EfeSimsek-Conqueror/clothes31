@@ -21,7 +21,6 @@
 		B1CA200000000000000C0009 /* InvitationDecoderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1CA200000000000000C000A /* InvitationDecoderView.swift */; };
 		B1CA500000000000000C000F /* EditCoverSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1CA500000000000000C0010 /* EditCoverSheet.swift */; };
 		81062D0C3F9EAB0E366427AD /* DecodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03C366443337B558D3AC988E /* DecodeView.swift */; };
-		E5ECFFAF7696B05C510FD78B /* RoastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58347C82ACC74D30334205CB /* RoastView.swift */; };
 		8D772FE3788951D13A161870 /* ScoreSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F743EBDDA3A5EDED869C70 /* ScoreSheetView.swift */; };
 		A2936FE818C011472D3F5B69 /* TryOnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE5CD51808F92D88F7B0A39 /* TryOnView.swift */; };
 		A0314F4D3B330E82D96A24A6 /* VersusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B121D0DF7AA6F8BC7A1B7713 /* VersusView.swift */; };
@@ -41,7 +40,6 @@
 		8B99E68CEAF68BDADC52C18D /* WeeklyWrappedCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3B5B0B042D83E0BB33AB6AC /* WeeklyWrappedCard.swift */; };
 		E25B69CF3191E55ACAD764A3 /* JournalExtras.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65B0DE949C785C54CE70A0C3 /* JournalExtras.swift */; };
 		1FB4CF645AF02EBE50E23E73 /* JournalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7470D335C8D1F2AE1B07DF29 /* JournalView.swift */; };
-		B85C7FDA33D01AD056C2EB19 /* HemIntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61CF72F6BDD59EAD7B7FDD63 /* HemIntroView.swift */; };
 		DE01E395F9A7848E484E8FE8 /* OnboardGenderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08269440B9EAF42CDD7D10BE /* OnboardGenderView.swift */; };
 		A859DD72C4DD44A63E2B9891 /* OnboardVibeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 444582F6F6563233599B1DE4 /* OnboardVibeView.swift */; };
 		B1CA100000000000000C0001 /* BodyCalibrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1CA100000000000000C0002 /* BodyCalibrationView.swift */; };
@@ -58,6 +56,7 @@
 		D225D9818C4785F334A617E9 /* AppScope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C3741AC8CAFB5906C5BAC3 /* AppScope.swift */; };
 		9BF27B80BA8A1D93951F4088 /* CreditsBus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22FD0D22A7B30F386FAF40D4 /* CreditsBus.swift */; };
 		A8A749CC9B5807FE35BB2C4B /* ToastBus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D544F120132DC60D8757F4 /* ToastBus.swift */; };
+		F1CE0000000000000000A002 /* ReportContentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1CE0000000000000000A001 /* ReportContentSheet.swift */; };
 		AA100001A0000000A0000001 /* CameraBus.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA200001A0000000A0000001 /* CameraBus.swift */; };
 		AA100002A0000000A0000002 /* CreditsGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA200002A0000000A0000002 /* CreditsGate.swift */; };
 		AA100003A0000000A0000003 /* SubscoresView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA200003A0000000A0000003 /* SubscoresView.swift */; };
@@ -83,9 +82,9 @@
 		075FEA8D97C045BFA45BC4B1 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 1A15F9EA355774A421DAB30F /* Kingfisher */; };
 		6DA505981890A58E08D2B1BE /* KeychainAccess in Frameworks */ = {isa = PBXBuildFile; productRef = 316DB320C5D1B88EEABC6D4E /* KeychainAccess */; };
 		F1FBA5E00000000000000B01 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = F1FBA5E00000000000000A02 /* FirebaseCrashlytics */; };
-		F1FBA5E00000000000000B02 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = F1FBA5E00000000000000A03 /* FirebaseAnalytics */; };
 		F1FBA5E00000000000000B03 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = F1FBA5E00000000000000A04 /* FirebaseCore */; };
 		F1FBA5E00000000000000D02 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = F1FBA5E00000000000000D01 /* GoogleService-Info.plist */; };
+		F1CE0000000000000000B002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F1CE0000000000000000B001 /* PrivacyInfo.xcprivacy */; };
 		F1FBA5E00000000000000E01 /* CameraMenuBus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1FBA5E00000000000000E02 /* CameraMenuBus.swift */; };
 		F1DNA000000000000000A001 /* StyleDna.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1DNA000000000000000A002 /* StyleDna.swift */; };
 		F1DNA000000000000000B001 /* WrappedCardRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1DNA000000000000000B002 /* WrappedCardRenderer.swift */; };
@@ -109,7 +108,6 @@
 		B1CA200000000000000C000A /* InvitationDecoderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvitationDecoderView.swift; sourceTree = "<group>"; };
 		B1CA500000000000000C0010 /* EditCoverSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCoverSheet.swift; sourceTree = "<group>"; };
 		03C366443337B558D3AC988E /* DecodeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecodeView.swift; sourceTree = "<group>"; };
-		58347C82ACC74D30334205CB /* RoastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoastView.swift; sourceTree = "<group>"; };
 		C1F743EBDDA3A5EDED869C70 /* ScoreSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreSheetView.swift; sourceTree = "<group>"; };
 		5EE5CD51808F92D88F7B0A39 /* TryOnView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TryOnView.swift; sourceTree = "<group>"; };
 		B121D0DF7AA6F8BC7A1B7713 /* VersusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersusView.swift; sourceTree = "<group>"; };
@@ -129,7 +127,6 @@
 		E3B5B0B042D83E0BB33AB6AC /* WeeklyWrappedCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyWrappedCard.swift; sourceTree = "<group>"; };
 		65B0DE949C785C54CE70A0C3 /* JournalExtras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalExtras.swift; sourceTree = "<group>"; };
 		7470D335C8D1F2AE1B07DF29 /* JournalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalView.swift; sourceTree = "<group>"; };
-		61CF72F6BDD59EAD7B7FDD63 /* HemIntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HemIntroView.swift; sourceTree = "<group>"; };
 		08269440B9EAF42CDD7D10BE /* OnboardGenderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardGenderView.swift; sourceTree = "<group>"; };
 		444582F6F6563233599B1DE4 /* OnboardVibeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardVibeView.swift; sourceTree = "<group>"; };
 		B1CA100000000000000C0002 /* BodyCalibrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyCalibrationView.swift; sourceTree = "<group>"; };
@@ -164,10 +161,12 @@
 		429DAFA4CEA4D2427A8638E3 /* WeeklyLetterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyLetterView.swift; sourceTree = "<group>"; };
 		F4520D96AC0EDB42E750BB2B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		12F1C9823B7D241C34392D7F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F1CE0000000000000000B001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		2C37D635A81B2A4946CBDDE6 /* Fitrater.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Fitrater.entitlements; sourceTree = "<group>"; };
 		44154A3A9AD4F947B9EB7FE1 /* Fitrater.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Fitrater.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F1FBA5E00000000000000D01 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "FitScore/GoogleService-Info.plist"; sourceTree = SOURCE_ROOT; };
 		F1FBA5E00000000000000E02 /* CameraMenuBus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraMenuBus.swift; sourceTree = "<group>"; };
+		F1CE0000000000000000A001 /* ReportContentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportContentSheet.swift; sourceTree = "<group>"; };
 		F1DNA000000000000000A002 /* StyleDna.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StyleDna.swift; sourceTree = "<group>"; };
 		F1DNA000000000000000B002 /* WrappedCardRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WrappedCardRenderer.swift; sourceTree = "<group>"; };
 		F1DNA000000000000000C002 /* StyleDnaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StyleDnaView.swift; sourceTree = "<group>"; };
@@ -189,7 +188,6 @@
 				075FEA8D97C045BFA45BC4B1 /* Kingfisher in Frameworks */,
 				6DA505981890A58E08D2B1BE /* KeychainAccess in Frameworks */,
 				F1FBA5E00000000000000B01 /* FirebaseCrashlytics in Frameworks */,
-				F1FBA5E00000000000000B02 /* FirebaseAnalytics in Frameworks */,
 				F1FBA5E00000000000000B03 /* FirebaseCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -233,6 +231,7 @@
 				F4520D96AC0EDB42E750BB2B /* Assets.xcassets */,
 				2C37D635A81B2A4946CBDDE6 /* Fitrater.entitlements */,
 				12F1C9823B7D241C34392D7F /* Info.plist */,
+				F1CE0000000000000000B001 /* PrivacyInfo.xcprivacy */,
 				6A65C882BE553E9D72C8E084 /* PaywallView.swift */,
 			);
 			name = Fitrater;
@@ -271,7 +270,6 @@
 				B1CA200000000000000C000A /* InvitationDecoderView.swift */,
 				B1CA500000000000000C0010 /* EditCoverSheet.swift */,
 				03C366443337B558D3AC988E /* DecodeView.swift */,
-				58347C82ACC74D30334205CB /* RoastView.swift */,
 				C1F743EBDDA3A5EDED869C70 /* ScoreSheetView.swift */,
 				5EE5CD51808F92D88F7B0A39 /* TryOnView.swift */,
 				B121D0DF7AA6F8BC7A1B7713 /* VersusView.swift */,
@@ -332,7 +330,6 @@
 		C3170A6937369DA86ACEBD3B /* Onboarding */ = {
 			isa = PBXGroup;
 			children = (
-				61CF72F6BDD59EAD7B7FDD63 /* HemIntroView.swift */,
 				08269440B9EAF42CDD7D10BE /* OnboardGenderView.swift */,
 				444582F6F6563233599B1DE4 /* OnboardVibeView.swift */,
 				B1CA100000000000000C0002 /* BodyCalibrationView.swift */,
@@ -386,6 +383,7 @@
 				F1DNA000000000000000B002 /* WrappedCardRenderer.swift */,
 				22FD0D22A7B30F386FAF40D4 /* CreditsBus.swift */,
 				AA200002A0000000A0000002 /* CreditsGate.swift */,
+				F1CE0000000000000000A001 /* ReportContentSheet.swift */,
 				AA200003A0000000A0000003 /* SubscoresView.swift */,
 				15D544F120132DC60D8757F4 /* ToastBus.swift */,
 				AA200004A0000000A0000004 /* Weather.swift */,
@@ -442,7 +440,6 @@
 				1A15F9EA355774A421DAB30F /* Kingfisher */,
 				316DB320C5D1B88EEABC6D4E /* KeychainAccess */,
 				F1FBA5E00000000000000A02 /* FirebaseCrashlytics */,
-				F1FBA5E00000000000000A03 /* FirebaseAnalytics */,
 				F1FBA5E00000000000000A04 /* FirebaseCore */,
 			);
 			productName = Fitrater;
@@ -490,6 +487,7 @@
 			files = (
 				F1FBA5E00000000000000D02 /* GoogleService-Info.plist in Resources */,
 				7D1DBA83F5517888388F38D2 /* Assets.xcassets in Resources */,
+				F1CE0000000000000000B002 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -543,7 +541,6 @@
 				B1CA200000000000000C0009 /* InvitationDecoderView.swift in Sources */,
 				B1CA500000000000000C000F /* EditCoverSheet.swift in Sources */,
 				81062D0C3F9EAB0E366427AD /* DecodeView.swift in Sources */,
-				E5ECFFAF7696B05C510FD78B /* RoastView.swift in Sources */,
 				8D772FE3788951D13A161870 /* ScoreSheetView.swift in Sources */,
 				A2936FE818C011472D3F5B69 /* TryOnView.swift in Sources */,
 				A0314F4D3B330E82D96A24A6 /* VersusView.swift in Sources */,
@@ -563,7 +560,6 @@
 				8B99E68CEAF68BDADC52C18D /* WeeklyWrappedCard.swift in Sources */,
 				E25B69CF3191E55ACAD764A3 /* JournalExtras.swift in Sources */,
 				1FB4CF645AF02EBE50E23E73 /* JournalView.swift in Sources */,
-				B85C7FDA33D01AD056C2EB19 /* HemIntroView.swift in Sources */,
 				B1CA100000000000000C0001 /* BodyCalibrationView.swift in Sources */,
 				B1CA100000000000000C0003 /* BodyProfileRevealView.swift in Sources */,
 				DE01E395F9A7848E484E8FE8 /* OnboardGenderView.swift in Sources */,
@@ -580,6 +576,7 @@
 				D225D9818C4785F334A617E9 /* AppScope.swift in Sources */,
 				9BF27B80BA8A1D93951F4088 /* CreditsBus.swift in Sources */,
 				A8A749CC9B5807FE35BB2C4B /* ToastBus.swift in Sources */,
+				F1CE0000000000000000A002 /* ReportContentSheet.swift in Sources */,
 				AA100001A0000000A0000001 /* CameraBus.swift in Sources */,
 				AA100002A0000000A0000002 /* CreditsGate.swift in Sources */,
 				AA100003A0000000A0000003 /* SubscoresView.swift in Sources */,
@@ -666,7 +663,7 @@
 				CODE_SIGN_ENTITLEMENTS = FitScore/Fitrater.entitlements;
 				DEVELOPMENT_TEAM = NCYFB69WBK;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 16;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = FitScore/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -695,8 +692,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_ENTITLEMENTS = FitScore/Fitrater.entitlements;
 				DEVELOPMENT_TEAM = NCYFB69WBK;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 16;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = FitScore/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -711,7 +707,6 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = 1;
-				ENABLE_PREVIEWS = YES;
 			};
 			name = Release;
 		};
@@ -829,11 +824,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = F1FBA5E00000000000000A01 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseCrashlytics;
-		};
-		F1FBA5E00000000000000A03 /* FirebaseAnalytics */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = F1FBA5E00000000000000A01 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAnalytics;
 		};
 		F1FBA5E00000000000000A04 /* FirebaseCore */ = {
 			isa = XCSwiftPackageProductDependency;

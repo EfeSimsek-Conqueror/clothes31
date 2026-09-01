@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 enum CameraFlow: String, Identifiable {
-    case score, tryon, versus, roast, decode, occasion, paywall
+    case score, tryon, versus, decode, occasion, paywall
     // Sprint 3 + 5 additions
     case cover       // manual magazine-cover composer
     case invitation  // decode a printed invite → 3 closet combos

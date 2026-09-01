@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { LegalShell, LegalSection } from "@/components/legal";
 
 export const metadata: Metadata = {
@@ -11,7 +12,7 @@ const CONTACT = "efe@cloudgeng.com";
 
 export default function TermsPage() {
   return (
-    <LegalShell title="Terms of Service" updated="26 July 2026">
+    <LegalShell title="Terms of Service" updated="1 September 2026">
       <LegalSection heading="1. Agreement">
         <p>
           These terms are an agreement between you and {COMPANY}
@@ -25,11 +26,12 @@ export default function TermsPage() {
       <LegalSection heading="2. The service">
         <p>
           Fitrater lets you photograph outfits and garments and receive
-          AI-generated feedback: scores, roasts, comparisons, virtual try-ons,
-          look breakdowns, and generated garment images. Results are produced
-          by automated models for style guidance and entertainment. They may be
-          inaccurate, inconsistent, or unflattering, and they are not
-          professional advice of any kind.
+          AI-generated feedback: scores and per-piece notes, A-vs-B
+          comparisons, virtual try-ons, look breakdowns, occasion planning,
+          styling chat, and generated garment images. Results are produced by
+          automated models for style guidance and entertainment. They may be
+          inaccurate or inconsistent, and they are not professional advice of
+          any kind.
         </p>
       </LegalSection>
 
@@ -45,9 +47,9 @@ export default function TermsPage() {
       <LegalSection heading="4. Credits and subscriptions">
         <p>
           Features are paid for with in-app credits. Credits are granted on
-          sign-up, earned through in-app rewards, included with subscriptions,
-          or purchased as one-time packs. Purchases are processed by the app
-          store you use (Google Play or the App Store), and refunds are
+          sign-up, included with a Fitrater Pro subscription, or purchased as
+          one-time packs. Purchases are processed by the app store you use
+          (Google Play or the App Store), and refunds are
           governed by that store&rsquo;s policies. Subscriptions renew
           automatically until cancelled in your store account settings; usage
           may be subject to fair-use caps shown in the app.
@@ -125,7 +127,9 @@ export default function TermsPage() {
           protections of your country of residence remain unaffected.
         </p>
         <p>
-          Questions? Contact{" "}
+          Questions? See our{" "}
+          <Link className="underline" href="/support">support page</Link>, or
+          contact{" "}
           <a className="underline" href={`mailto:${CONTACT}`}>{CONTACT}</a>.
         </p>
       </LegalSection>

@@ -4,11 +4,16 @@ import RevenueCat
 struct ManageProView: View {
     let onOpenPlans: () -> Void
 
+    @EnvironmentObject var toasts: ToastBus
+
     @State private var loaded = false
     @State private var info: CustomerInfo?
     @State private var spentThisMonth = 0
+    @State private var restoring = false
 
-    private var proEnt: EntitlementInfo? { info?.entitlements.all["pro"] }
+    /// One entitlement id, owned by `RcBilling` — reading a different string
+    /// here is how paying members ended up staring at the upsell.
+    private var proEnt: EntitlementInfo? { info?.entitlements.all[RcBilling.entitlementPro] }
     private var isPro: Bool { proEnt?.isActive == true }
 
     var body: some View {
@@ -25,6 +30,7 @@ struct ManageProView: View {
                     } else if let ent = proEnt {
                         ProContent(ent: ent, spentThisMonth: spentThisMonth)
                     }
+                    if loaded { restoreRow }
                     Spacer().frame(height: 40)
                 }
                 .padding(20)
@@ -39,6 +45,40 @@ struct ManageProView: View {
         }
         spentThisMonth = (try? await Repo.shared.creditsSpentThisMonth()) ?? 0
         loaded = true
+    }
+
+    /// Second home for Restore — the paywall has one, and Apple looks for it
+    /// in Settings too. Same RcBilling path, same wording as the paywall.
+    private var restoreRow: some View {
+        Button {
+            Haptic.chip()
+            Task { await restore() }
+        } label: {
+            Text(restoring ? "Restoring…" : "Restore purchases")
+                .font(Serif.body(15, weight: .medium)).foregroundStyle(Palette.ink)
+                .frame(maxWidth: .infinity).padding(.vertical, 14)
+                .overlay(Capsule().stroke(Palette.ink.opacity(0.55), lineWidth: 1))
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(restoring)
+        .padding(.top, 8)
+    }
+
+    private func restore() async {
+        restoring = true
+        defer { restoring = false }
+        do {
+            let restored = try await RcBilling.shared.restore()
+            info = restored
+            if restored.entitlements.active.keys.contains(RcBilling.entitlementPro) {
+                toasts.post("Purchases restored.")
+            } else {
+                toasts.post("No purchases to restore.")
+            }
+        } catch {
+            toasts.post("Couldn't restore — try again.")
+        }
     }
 }
 

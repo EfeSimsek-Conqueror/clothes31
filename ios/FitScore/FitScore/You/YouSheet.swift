@@ -1,7 +1,6 @@
 import SwiftUI
 import Kingfisher
 import PhotosUI
-import StoreKit
 
 /// "You" tab content — profile / stats / honesty / links.
 struct YouSheet: View {
@@ -29,7 +28,6 @@ struct YouSheet: View {
     @State private var goWeekly = false
     @State private var goAppearance = false
     @State private var goManagePro = false
-    @State private var rateBusy = false
 
     var body: some View {
         NavigationStack {
@@ -281,24 +279,22 @@ struct YouSheet: View {
         .buttonStyle(.plain)
     }
 
+    /// A tap opens the App Store review form. Deliberately NOT
+    /// `SKStoreReviewController` — Apple reserves that for moments the app
+    /// chooses, never for a button, and the system throttle means a tapped
+    /// request usually does nothing at all. Nothing is granted, promised, or
+    /// gated on this row: the rating is a favour, not a transaction.
     private var rateRow: some View {
         Button {
-            guard !rateBusy else { return }
-            rateBusy = true
-            if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
-                SKStoreReviewController.requestReview(in: scene)
-            }
-            Task {
-                try? await Task.sleep(nanoseconds: 300_000_000)
-                rateBusy = false
-            }
+            Haptic.chip()
+            openWriteReview()
         } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Rate on App Store")
                         .font(Serif.body(16, weight: .medium))
                         .foregroundStyle(Palette.ink)
-                    Text(rateBusy ? "Opening…" : "One tap. It helps a lot.")
+                    Text("Opens the App Store.")
                         .font(Serif.body(13)).foregroundStyle(Palette.muted)
                 }
                 Spacer()
@@ -308,8 +304,21 @@ struct YouSheet: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(rateBusy)
     }
+
+    private func openWriteReview() {
+        // App Store app first; the https form is the fallback. `canOpenURL`
+        // is no help here — itms-apps is not a declared query scheme — so we
+        // let `open` tell us whether it landed.
+        let store = URL(string: "itms-apps://apps.apple.com/app/id\(Self.appStoreId)?action=write-review")!
+        let web = URL(string: "https://apps.apple.com/app/id\(Self.appStoreId)?action=write-review")!
+        UIApplication.shared.open(store) { opened in
+            if !opened { UIApplication.shared.open(web) }
+        }
+    }
+
+    /// App Store Connect app id for com.fitrater.app.
+    private static let appStoreId = "6794940458"
 
     private var signOutButton: some View {
         Button {

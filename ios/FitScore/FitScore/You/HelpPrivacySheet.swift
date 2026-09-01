@@ -81,7 +81,7 @@ struct HelpPrivacySheet: View {
                     }
 
                     Spacer().frame(height: 24)
-                    Text("Questions? support@fitrater.com")
+                    Text("Questions? efe@cloudgeng.com")
                         .font(Serif.body(13)).foregroundStyle(Palette.muted)
                     Spacer().frame(height: 24)
                 }
@@ -104,17 +104,29 @@ struct HelpPrivacySheet: View {
                 Button(deleting ? "Deleting…" : "DELETE", role: .destructive) {
                     guard typedConfirm.trimmingCharacters(in: .whitespaces) == "DELETE" else { return }
                     deleting = true
-                    Task {
-                        try? await Repo.shared.deleteAllUserData()
-                        toasts.post("Account deleted")
-                        deleting = false
-                        onClose()
-                    }
+                    Task { await deleteAccount() }
                 }
                 .disabled(deleting || typedConfirm.trimmingCharacters(in: .whitespaces) != "DELETE")
             } message: {
                 Text("This wipes every look, piece, and note. Type DELETE below to confirm.")
             }
+        }
+    }
+
+    /// Only claim the account is gone when the server says it is. Deletion now
+    /// removes the auth identity too, so a half-failure must surface as an
+    /// error instead of a cheerful toast and a sign-out.
+    private func deleteAccount() async {
+        defer {
+            deleting = false
+            typedConfirm = ""
+        }
+        do {
+            try await Repo.shared.deleteAllUserData()
+            toasts.post("Account deleted")
+            onClose()
+        } catch {
+            toasts.post("Delete failed: \(error.localizedDescription)")
         }
     }
 

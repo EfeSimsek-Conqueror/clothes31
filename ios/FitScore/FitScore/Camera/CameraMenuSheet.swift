@@ -12,7 +12,6 @@ struct CameraMenuSheet: View {
     @State private var showScore = false
     @State private var showTryOn = false
     @State private var showVersus = false
-    @State private var showRoast = false
     @State private var showDecode = false
     @State private var showPaywall = false
     @State private var paywallContext: PaywallContext? = nil

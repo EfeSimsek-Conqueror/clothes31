@@ -702,28 +702,11 @@ final class Repo {
         }
     }
 
-    // MARK: - Sprint 2: transcribe-intent + annotation/fit-map persistence
-
-    /// Call the `transcribe-intent` edge function with a signed audio URL.
-    /// Returns the raw + sanitized transcript from Fal wizper.
-    func transcribeIntent(audioUrl: String) async throws -> TranscribeResponse {
-        struct Payload: Encodable { let audio_url: String }
-        let payload = Payload(audio_url: audioUrl)
-        let decoder = JSONDecoder()
-        do {
-            return try await functions.invoke(
-                "transcribe-intent",
-                options: FunctionInvokeOptions(body: payload),
-                decoder: decoder
-            )
-        } catch {
-            if case FunctionsError.httpError(_, let data) = error,
-               let text = String(data: data, encoding: .utf8) {
-                return TranscribeResponse(transcript: nil, sanitized: nil, engine: nil, error: String(text.prefix(200)))
-            }
-            throw error
-        }
-    }
+    // MARK: - Sprint 2: annotation/fit-map persistence
+    //
+    // The `transcribeIntent` wrapper used to live here. It was never called by
+    // any screen, and shipping it would have obliged the app to declare
+    // NSMicrophoneUsageDescription, which it does not. Removed Sep 2026.
 
     /// Batch-insert markup annotations for an outfit. Deletes existing rows
     /// for the outfit first so this is a full replace (matches the batch semantics
@@ -1331,28 +1314,40 @@ final class Repo {
         return try JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
     }
 
-    /// Wipe user-owned rows and storage folders. Signs out at the end.
+    /// Hard-delete the account. The `delete-account` edge function owns the whole
+    /// wipe now — rows, storage prefixes, Sign in with Apple revocation, and the
+    /// `auth.users` row itself, which a client can never delete for itself. The
+    /// old client-side sweep left the identity alive, so the same Apple/Google/
+    /// email login walked straight back in.
+    ///
+    /// Throws on any failure. Callers must not claim success unless this returns.
+    /// Signs out only once the server has confirmed deletion.
     func deleteAllUserData() async throws {
-        guard let uid = userId else { return }
-        // Rows first — storage deletes are best-effort and shouldn't block sign-out.
-        let userTables = ["outfits", "closet_items", "credit_transactions", "hem_notes", "sunday_letters", "push_settings"]
-        for table in userTables {
-            _ = try? await Supa.client.from(table).delete().eq("user_id", value: uid).execute()
+        guard userId != nil else { throw RepoError.notSignedIn }
+        struct Response: Decodable {
+            let deleted: Bool?
+            let error: String?
+            let detail: String?
         }
-        _ = try? await Supa.client.from("profiles").delete().eq("id", value: uid).execute()
-        // Storage — no recursive delete; list + remove.
-        let prefix = "\(uid)/"
-        for bucket in ["avatars", "closet", "outfits", "references"] {
-            do {
-                let items = try await storage.from(bucket).list(path: prefix)
-                if !items.isEmpty {
-                    let paths = items.map { prefix + $0.name }
-                    _ = try await storage.from(bucket).remove(paths: paths)
-                }
-            } catch {
-                // Best-effort — ignore per-bucket failures.
+        let payload: [String: String] = [:]
+        let response: Response
+        do {
+            response = try await functions.invoke(
+                "delete-account",
+                options: FunctionInvokeOptions(body: payload),
+                decoder: JSONDecoder()
+            )
+        } catch {
+            if case FunctionsError.httpError(_, let data) = error,
+               let text = String(data: data, encoding: .utf8) {
+                throw RepoError.deleteFailed(String(text.prefix(200)))
             }
+            throw error
         }
+        guard response.deleted == true else {
+            throw RepoError.deleteFailed(response.error ?? response.detail ?? "Account deletion did not complete")
+        }
+        // Local session teardown only — the server already removed the account.
         try? await auth.signOut()
     }
 
@@ -1393,12 +1388,14 @@ enum RepoError: Error, LocalizedError {
     case notSignedIn
     case notFound
     case badURL
+    case deleteFailed(String)
 
     var errorDescription: String? {
         switch self {
         case .notSignedIn: return "Not signed in"
         case .notFound: return "Not found"
         case .badURL: return "Invalid URL"
+        case .deleteFailed(let detail): return detail
         }
     }
 }

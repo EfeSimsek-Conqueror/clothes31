@@ -9,22 +9,22 @@
     <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
     <key>CFBundleDisplayName</key><string>Fitrater</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>1.0</string>
-    <key>CFBundleVersion</key><string>4</string>
+    <key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
+    <key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
     <key>LSRequiresIPhoneOS</key><true/>
     <key>UILaunchScreen</key><dict/>
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>
     </array>
-    <!-- Camera + Photo library — required copy for camera flows (Score, TryOn, Roast, Decode). -->
+    <!-- Camera + Photo library — required copy for camera flows (Score, TryOn, Decode). -->
     <key>NSCameraUsageDescription</key>
     <string>Fitrater uses your camera to score outfits and try on generated pieces.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Fitrater imports photos so you can score existing looks.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>Fitrater saves generated pieces and rated looks to your library.</string>
-    <!-- OAuth callback + Google Sign-In URL types. The `com.cloudgeng.mealmind` scheme
+    <!-- OAuth callback + Google Sign-In URL types. The `com.fitrater.app` scheme
          is the Supabase magic-link / OIDC callback; the reversed Google client
          id is required by GoogleSignIn to receive its own callback. -->
     <key>CFBundleURLTypes</key>

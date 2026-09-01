@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Eyebrow,
   PhoneFrame,
@@ -7,9 +8,9 @@ import {
 } from "@/components/design-system";
 
 const features = [
-  { n: "I.", text: "Unlimited look scoring with Hem's notes." },
-  { n: "II.", text: "The Mirror — try any piece on your photo." },
-  { n: "III.", text: "Closet auto-tagging & the Sunday letter." },
+  { n: "I.", text: "Unlimited scoring, with Hem's per-piece notes." },
+  { n: "II.", text: "Try on — wear any piece on your own photo." },
+  { n: "III.", text: "Studio without the cap & the Sunday letter." },
 ];
 
 export default function PaywallPage() {
@@ -17,7 +18,7 @@ export default function PaywallPage() {
     <PhoneFrame>
       <PhoneScroll padBottomNav={false}>
         <div className="px-8 pt-14 pb-12">
-          <Eyebrow>FitScore Pro</Eyebrow>
+          <Eyebrow>Fitrater Pro</Eyebrow>
           <SerifDisplay size="hero" className="mt-3">
             Every feature.
             <br />
@@ -40,31 +41,41 @@ export default function PaywallPage() {
           {/* Annual — featured */}
           <div className="mt-10 relative bg-card border border-ink rounded-[6px] p-6">
             <span className="absolute -top-3 left-6 bg-bronze text-white text-[0.6rem] tracking-[0.22em] uppercase px-2 h-6 inline-flex items-center rounded-sm">
-              Save 50%
+              Save 55%
             </span>
             <div className="flex items-baseline justify-between">
               <span className="serif text-xl">Annual</span>
-              <span className="serif text-2xl">$59.99</span>
+              <span className="serif text-2xl">$79.99</span>
             </div>
             <p className="text-muted mt-2 text-sm">
-              7 days free, then $59.99 / year.
+              7 days free, then $79.99 / year.
             </p>
           </div>
 
           {/* Monthly */}
           <div className="mt-4 border hairline rounded-[6px] p-6 flex items-baseline justify-between">
             <span className="serif text-xl">Monthly</span>
-            <span className="serif text-lg">$9.99 / month</span>
+            <span className="serif text-lg">$14.99 / month</span>
           </div>
 
           <div className="mt-10 space-y-3">
             <PrimaryLink href="/app" full>
               Start 7-Day Free Trial
             </PrimaryLink>
-            <button className="w-full text-center text-sm text-muted underline underline-offset-4">
-              Restore purchases
-            </button>
+            <Link
+              href="/support"
+              className="block w-full text-center text-sm text-muted underline underline-offset-4"
+            >
+              Restore purchases &amp; billing help
+            </Link>
           </div>
+
+          <p className="mt-6 text-[0.72rem] leading-relaxed text-muted">
+            Monthly is $14.99 / month after a 3-day free trial. Both plans
+            renew automatically until cancelled in your App Store or Google
+            Play account settings. Prices in USD; your store charges in your
+            local currency.
+          </p>
         </div>
       </PhoneScroll>
     </PhoneFrame>

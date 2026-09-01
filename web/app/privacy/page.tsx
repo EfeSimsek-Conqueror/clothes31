@@ -11,7 +11,7 @@ const CONTACT = "efe@cloudgeng.com";
 
 export default function PrivacyPage() {
   return (
-    <LegalShell title="Privacy Policy" updated="26 July 2026">
+    <LegalShell title="Privacy Policy" updated="1 September 2026">
       <LegalSection heading="1. Who we are">
         <p>
           Fitrater (also branded &ldquo;FitScore / Hem&rdquo;) is operated by{" "}
@@ -43,13 +43,21 @@ export default function PrivacyPage() {
           subscription, the purchase is handled by the app store (Google Play
           or the App Store) and our billing provider RevenueCat. We receive
           purchase records — not your payment card details — and keep a ledger
-          of the credits you earn and spend.
+          of the credits you receive and spend.
         </p>
         <p>
-          <strong>Approximate location (optional).</strong> With your
-          permission, the app reads your approximate location to show local
-          weather on the home screen. Coordinates are sent to the weather
-          service to fetch the forecast and are not stored by us.
+          <strong>Approximate location (Android only, optional).</strong> On
+          Android, if you grant the permission, the app reads your approximate
+          location to show local weather on the home screen. The coordinates go
+          to the weather service to fetch that forecast and are not stored by
+          us. The iOS app does not request or use your location at all.
+        </p>
+        <p>
+          <strong>Crash diagnostics.</strong> If the app crashes, an automatic
+          report is sent to our crash-reporting provider containing the device
+          model, operating system version, app version, and the technical
+          details of the crash. These reports are not linked to your account
+          and are used only to find and fix bugs.
         </p>
         <p>
           <strong>Preferences and support.</strong> We store your in-app
@@ -75,8 +83,12 @@ export default function PrivacyPage() {
             (performance of contract and legitimate interest);
           </li>
           <li>
-            show local weather when you grant location access (consent, which
-            you can withdraw at any time in your device settings);
+            show local weather on Android when you grant location access
+            (consent, which you can withdraw at any time in your device
+            settings);
+          </li>
+          <li>
+            diagnose crashes so we can fix them (legitimate interest);
           </li>
           <li>
             respond to support requests and keep the service secure (legitimate
@@ -91,7 +103,7 @@ export default function PrivacyPage() {
           Fitrater&rsquo;s core features are powered by artificial intelligence.
           Photos you submit are shared with third-party AI processing providers
           solely to generate the result you requested (for example a score,
-          roast, comparison, try-on image, or generated garment). Results are
+          comparison, try-on image, or generated garment). Results are
           automated and provided for style guidance and entertainment; they are
           opinions of a model, not facts about you.
         </p>
@@ -118,8 +130,15 @@ export default function PrivacyPage() {
             <strong>Google</strong> — sign-in and Google Play billing;
           </li>
           <li>
-            <strong>Open-Meteo</strong> — weather forecasts (receives
-            coordinates only, when you enable location).
+            <strong>Google Firebase Crashlytics</strong> — crash and error
+            diagnostics (device model, OS version, app version, and the crash
+            stack trace). We do not use Firebase Analytics, and there is no
+            advertising SDK in the app;
+          </li>
+          <li>
+            <strong>Open-Meteo</strong> — weather forecasts. It receives
+            coordinates only, and only for that lookup; no device location is
+            sent from the iOS app.
           </li>
         </ul>
         <p>

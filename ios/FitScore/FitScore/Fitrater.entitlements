@@ -7,9 +7,6 @@
     <array>
         <string>Default</string>
     </array>
-    <!-- Push notifications capability — used later for morning stylist / weekly wrapped. -->
-    <key>aps-environment</key>
-    <string>development</string>
     <key>com.apple.developer.associated-domains</key>
     <array>
         <string>applinks:fitrater.ai</string>
