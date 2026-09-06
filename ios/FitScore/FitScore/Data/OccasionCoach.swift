@@ -76,17 +76,23 @@ enum OccasionCoachService {
 
     private struct Payload: Encodable {
         let prompt: String
-        let closet_items: [ClosetSlim]
+        let must_use: [ClosetSlim]
         let style_profile: StyleSlim
     }
 
-    static func plan(prompt: String) async throws -> [OccasionCombo] {
+    /// Plan three combos for an occasion.
+    ///
+    /// `chosen` is the only thing the coach treats as already owned. Sending the
+    /// whole closet and letting the model guess which items a combo "probably"
+    /// meant produced looks built around pieces the wearer had not asked for,
+    /// so nothing is inferred: these appear in every combo, and everything else
+    /// is designed from scratch.
+    static func plan(prompt: String, chosen: [ClosetItem] = []) async throws -> [OccasionCombo] {
         // 1) Assemble input.
-        let closet = (try? await Repo.shared.closetItems(limit: 60)) ?? []
         let profile = try? await Repo.shared.currentProfile()
         let payload = Payload(
             prompt: prompt,
-            closet_items: closet.compactMap { c in
+            must_use: chosen.compactMap { c in
                 guard let id = c.id else { return nil }
                 return ClosetSlim(
                     id: id,

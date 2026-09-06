@@ -52,27 +52,6 @@ function normalize(s: any): string {
   return String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-// deno-lint-ignore no-explicit-any
-function matchClosetId(piece: any, closet: any[]): string | null {
-  if (!Array.isArray(closet) || closet.length === 0) return null;
-  const pn = normalize(piece?.name);
-  const pc = normalize(piece?.category);
-  const pcol = normalize(piece?.color);
-  let best: { id: string; score: number } | null = null;
-  for (const c of closet) {
-    const cn = normalize(c?.name);
-    const csub = normalize(c?.subcategory);
-    const ccat = normalize(c?.category);
-    const ccol = normalize(c?.color ?? c?.color_hex);
-    let score = 0;
-    if (pn && cn && (cn.includes(pn.split(" ")[0]) || pn.includes(cn.split(" ")[0]))) score += 3;
-    if (pc && (pc === ccat || pc === csub)) score += 2;
-    if (pcol && ccol && (ccol.includes(pcol) || pcol.includes(ccol))) score += 2;
-    if (score > (best?.score ?? 0) && c?.id) best = { id: String(c.id), score };
-  }
-  return best && best.score >= 3 ? best.id : null;
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const json = (o: unknown, status = 200) =>
@@ -82,25 +61,35 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const promptText: string = String(body?.prompt ?? "").trim();
     if (!promptText) return json({ error: "missing_prompt" }, 400);
-    const closet = Array.isArray(body?.closet_items) ? body.closet_items : [];
+    // Only pieces the wearer explicitly chose on the composer screen. The
+    // coach used to receive the whole closet and guess which items a combo
+    // "probably" meant, which produced combos built around things the wearer
+    // had not asked for. Nothing is inferred now: these must appear, and
+    // everything else in the combo is designed from scratch.
+    const mustUse = Array.isArray(body?.must_use) ? body.must_use : [];
     const styleProfile = body?.style_profile ?? {};
     const gender = String(styleProfile?.gender ?? "unspecified");
     const styleTags: string[] = Array.isArray(styleProfile?.style_tags) ? styleProfile.style_tags : [];
 
-    const closetSlim = closet.slice(0, 60).map((c: Record<string, unknown>) => ({
+    const mustUseSlim = mustUse.slice(0, 8).map((c: Record<string, unknown>) => ({
       id: c.id, name: c.name, category: c.category,
       subcategory: c.subcategory, color: c.color ?? null, color_hex: c.color_hex ?? null,
     }));
+    const mustUseIds = new Set(mustUseSlim.map((c) => String(c.id)));
 
     const sys = `You are Hem, an editorial fashion stylist. The user needs 3 outfit combinations for this occasion:
 "${promptText}"
 
 The user's gender: ${gender}
 Style tags: ${JSON.stringify(styleTags)}
-Available closet pieces:
-${JSON.stringify(closetSlim)}
+Pieces the wearer has chosen and wants to wear${mustUseSlim.length ? "" : " (none — design everything)"}:
+${JSON.stringify(mustUseSlim)}
 
-Return exactly 3 combinations. Each combination is a full outfit (top/bottom/shoes/accessory as needed). For each piece, PREFER matching an existing closet item by name+category+color. If no good match exists, describe the ideal piece with a generation prompt.
+Return exactly 3 combinations. Each combination is a full outfit (top/bottom/shoes/accessory as needed).
+
+Every chosen piece above MUST appear in EVERY combination, with its exact "id" copied into that piece's "matched_closet_id" and "generate_prompt" set to null. Keep its name as given. The combinations differ in what you build AROUND those pieces.
+
+Design every other piece from scratch: set "matched_closet_id" to null and write a "generate_prompt" for it. Never invent an id.
 
 Output STRICT JSON only:
 {
@@ -142,9 +131,10 @@ No markdown, no prose outside JSON.`;
         .slice(0, 5),
       // deno-lint-ignore no-explicit-any
       pieces: (Array.isArray(c?.pieces) ? c.pieces : []).map((p: any) => {
+        // An id only survives if the wearer actually chose that piece; a model
+        // that invents one gets a generated piece instead of a wrong garment.
         const modelMatched = p?.matched_closet_id ? String(p.matched_closet_id) : null;
-        const stillPresent = modelMatched && closet.some((x: Record<string, unknown>) => String(x.id) === modelMatched);
-        const matched = stillPresent ? modelMatched : matchClosetId(p, closet);
+        const matched = modelMatched && mustUseIds.has(modelMatched) ? modelMatched : null;
         const genPrompt = matched
           ? null
           : (typeof p?.generate_prompt === "string" && p.generate_prompt.trim().length > 0
@@ -161,6 +151,27 @@ No markdown, no prose outside JSON.`;
         };
       }),
     }));
+
+    // The prompt asks for every chosen piece in every combo, but a dropped one
+    // would silently turn into a piece the wearer pays to regenerate. Put back
+    // whatever the model left out rather than trusting it to have complied.
+    // deno-lint-ignore no-explicit-any
+    for (const combo of combos as any[]) {
+      for (const chosen of mustUseSlim) {
+        const id = String(chosen.id);
+        // deno-lint-ignore no-explicit-any
+        if (combo.pieces.some((p: any) => p.matched_closet_id === id)) continue;
+        combo.pieces.unshift({
+          name: String(chosen.name ?? "Your piece"),
+          category: String(chosen.category ?? ""),
+          color: String(chosen.color ?? ""),
+          fabric: "",
+          detail: "",
+          matched_closet_id: id,
+          generate_prompt: null,
+        });
+      }
+    }
 
     return json({ combos });
   } catch (e) {

@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 import UIKit
 
 /// Occasion Coach — Hem plans 3 curated outfit combinations for the occasion
@@ -20,6 +21,12 @@ struct OccasionCoachView: View {
     @State private var renders: [UUID: String] = [:]
     @State private var renderingId: UUID?
     @State private var renderErrors: [UUID: String] = [:]
+    @State private var closetPieces: [ClosetItem] = []
+    @State private var pieceUrls: [String: String] = [:]
+    @State private var chosenIds: Set<String> = []
+    @State private var showPhotoPicker = false
+    @State private var photoItem: PhotosPickerItem?
+    @State private var uploading = false
     @FocusState private var promptFocused: Bool
 
     /// Occasions, grouped so a long list stays scannable. These are deliberately
@@ -129,6 +136,165 @@ struct OccasionCoachView: View {
             .foregroundStyle(canAddMore ? Palette.muted : Palette.bronze)
     }
 
+    // MARK: - Bring your own pieces
+
+    /// Everything in the closet, offered as a strip the wearer picks from. The
+    /// coach designs the rest of each combo around whatever is selected here.
+    @ViewBuilder
+    private var piecePicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Eyebrow(text: "USE MY PIECES")
+                Spacer()
+                if !chosenIds.isEmpty {
+                    Text("\(chosenIds.count) CHOSEN")
+                        .font(.system(size: 9.5, weight: .semibold))
+                        .tracking(1.4)
+                        .foregroundStyle(Palette.bronze)
+                }
+            }
+            Text("Optional. Anything you pick appears in all three combos — the rest is designed from scratch.")
+                .font(Serif.body(12))
+                .foregroundStyle(Palette.muted)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 10) {
+                    uploadTile
+                    ForEach(closetPieces) { piece in
+                        pieceTile(piece)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var uploadTile: some View {
+        Button {
+            Haptic.chip()
+            showPhotoPicker = true
+        } label: {
+            VStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Palette.card)
+                    .frame(width: 84, height: 110)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Palette.hairline, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                    )
+                    .overlay(
+                        VStack(spacing: 6) {
+                            if uploading {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "photo")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(Palette.muted)
+                                Text("PHOTO")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .tracking(1.3)
+                                    .foregroundStyle(Palette.muted)
+                            }
+                        }
+                    )
+                Text("Upload")
+                    .font(Serif.body(11))
+                    .foregroundStyle(Palette.muted)
+                    .frame(width: 84)
+            }
+        }
+        .disabled(uploading)
+    }
+
+    @ViewBuilder
+    private func pieceTile(_ piece: ClosetItem) -> some View {
+        let picked = piece.id.map { chosenIds.contains($0) } ?? false
+        Button {
+            Haptic.chip()
+            guard let id = piece.id else { return }
+            if chosenIds.contains(id) { chosenIds.remove(id) } else { chosenIds.insert(id) }
+        } label: {
+            VStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Palette.card)
+                    .frame(width: 84, height: 110)
+                    .overlay(
+                        Group {
+                            if let s = piece.image_path.flatMap({ pieceUrls[$0] }) ?? piece.image_url,
+                               let u = URL(string: s) {
+                                // Fit with an inset: a garment cut out on a pale
+                                // backdrop reads as the whole piece or not at
+                                // all, so nothing may be cropped, and the inset
+                                // keeps it clear of the rounded corners.
+                                AsyncImage(url: u) { $0.resizable().scaledToFit() } placeholder: { Color.clear }
+                                    .padding(6)
+                            }
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(picked ? Palette.ink : Palette.hairline, lineWidth: picked ? 2 : 1)
+                    )
+                    .overlay(alignment: .topTrailing) {
+                        if picked {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Palette.paper)
+                                .padding(5)
+                                .background(Circle().fill(Palette.ink))
+                                .padding(5)
+                        }
+                    }
+                Text(piece.name ?? piece.category ?? "Piece")
+                    .font(Serif.body(11))
+                    .foregroundStyle(picked ? Palette.ink : Palette.muted)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 84)
+            }
+        }
+    }
+
+    /// The chosen rows themselves, in the order the strip shows them.
+    private var chosenPieces: [ClosetItem] {
+        closetPieces.filter { $0.id.map { chosenIds.contains($0) } ?? false }
+    }
+
+    private func loadCloset() async {
+        let all = (try? await Repo.shared.closetItems(limit: 100)) ?? []
+        // A row with no picture cannot be rendered into a look, so offering it
+        // would be a dead tap.
+        let usable = all.filter { ($0.image_path?.isEmpty == false) || ($0.image_url?.isEmpty == false) }
+        pieceUrls = await Repo.shared.signedClosetUrls(usable.compactMap(\.image_path))
+        closetPieces = usable
+    }
+
+    private func adoptPhoto(_ data: Data) async {
+        guard let uid = Repo.shared.userId else { return }
+        uploading = true
+        defer { uploading = false }
+        do {
+            let path = try await Repo.shared.uploadClosetPhoto(bytes: data)
+            let item = try await Repo.shared.insertClosetItem(ClosetItemInsert(
+                user_id: uid,
+                name: "My piece",
+                category: "top",
+                subcategory: nil,
+                image_path: path,
+                color_hex: nil,
+                parent_id: nil,
+                source: "occasion_upload"
+            ))
+            await loadCloset()
+            // Uploading it is the choice; making the wearer tap it again would
+            // be asking the same question twice.
+            if let id = item.id { chosenIds.insert(id) }
+        } catch {
+            ToastBus.shared.post("Upload failed: \(error.localizedDescription)")
+        }
+    }
+
     /// What the wall says while Hem writes the three combos.
     private static let planLines = [
         "Reading the occasion",
@@ -177,7 +343,20 @@ struct OccasionCoachView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: busy)
         .animation(.easeInOut(duration: 0.2), value: renderingId)
-        .task { await refreshFree() }
+        .photosPicker(isPresented: $showPhotoPicker, selection: $photoItem, matching: .images)
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self) {
+                    await adoptPhoto(data)
+                }
+                photoItem = nil
+            }
+        }
+        .task {
+            await refreshFree()
+            await loadCloset()
+        }
     }
 
     // MARK: - Header
@@ -220,6 +399,8 @@ struct OccasionCoachView: View {
                 ForEach(Array(Self.modifierGroups.enumerated()), id: \.offset) { _, g in
                     chipGroup(g.0, g.1)
                 }
+                Hairline()
+                piecePicker
             }
 
             if busy {
@@ -485,7 +666,7 @@ struct OccasionCoachView: View {
                 }
             }
             do {
-                let result = try await OccasionCoachService.plan(prompt: trimmed)
+                let result = try await OccasionCoachService.plan(prompt: trimmed, chosen: chosenPieces)
                 if result.isEmpty {
                     error = "Hem couldn't compose 3 combos — try rewording."
                     busy = false
