@@ -129,6 +129,23 @@ struct OccasionCoachView: View {
             .foregroundStyle(canAddMore ? Palette.muted : Palette.bronze)
     }
 
+    /// What the wall says while Hem writes the three combos.
+    private static let planLines = [
+        "Reading the occasion",
+        "Going through your closet",
+        "Building three combos",
+        "Naming what is missing",
+    ]
+
+    /// What it says while a combo is being rendered — this one is genuinely
+    /// slow, since it makes a garment image per missing piece before stitching.
+    private static let renderLines = [
+        "Cutting the missing pieces",
+        "Filing them in your closet",
+        "Dressing the mannequin",
+        "Steaming the look",
+    ]
+
     var body: some View {
         ZStack {
             Palette.paper.ignoresSafeArea()
@@ -149,7 +166,17 @@ struct OccasionCoachView: View {
                     composerFooter
                 }
             }
+
+            // A wall, not an inline spinner. The chip list is long enough that
+            // an indicator placed after it sits below the fold, so tapping the
+            // pinned button looked like it did nothing at all.
+            if busy || renderingId != nil {
+                LoadingWall(lines: busy ? Self.planLines : Self.renderLines)
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: busy)
+        .animation(.easeInOut(duration: 0.2), value: renderingId)
         .task { await refreshFree() }
     }
 
@@ -336,15 +363,10 @@ struct OccasionCoachView: View {
                 }
             }
             Spacer(minLength: 10)
-            // Ownership is the only status worth a badge here: it is what
-            // decides whether this piece costs anything to render.
-            if p.isOwned {
-                HStack(spacing: 4) {
-                    Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold))
-                    Text("IN CLOSET").font(.system(size: 9.5, weight: .semibold)).tracking(1.4)
-                }
-                .foregroundStyle(Color(red: 0.20, green: 0.55, blue: 0.32))
-            } else {
+            // Only the pieces that have to be made are marked. Owning something
+            // is the quiet default, and badging every row you already own just
+            // spends attention on the rows that need none.
+            if !p.isOwned {
                 Text("NEW")
                     .font(.system(size: 9.5, weight: .semibold))
                     .tracking(1.4)
@@ -571,6 +593,53 @@ private struct DotsAnimation: View {
         .onAppear {
             Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { _ in
                 phase = (phase + 1) % 3
+            }
+        }
+    }
+}
+
+// MARK: - Loading wall
+
+/// Full-screen cover shown while the coach is working. It blocks the content
+/// underneath on purpose: both operations take long enough that a half-visible
+/// screen invites a second tap on a button that is already running.
+private struct LoadingWall: View {
+    let lines: [String]
+
+    @State private var index = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ZStack {
+            Palette.paper.ignoresSafeArea()
+            VStack(spacing: 16) {
+                HemMonogram(size: 34)
+                Text(lines.isEmpty ? "Working" : lines[min(index, lines.count - 1)])
+                    .font(Serif.italic(19))
+                    .foregroundStyle(Palette.ink)
+                    .multilineTextAlignment(.center)
+                    .id(index)
+                    .transition(.opacity)
+                Text("This one takes a moment.")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(1.4)
+                    .foregroundStyle(Palette.muted)
+            }
+            .padding(40)
+        }
+        // Swallow taps so the screen underneath cannot be driven while it runs.
+        .contentShape(Rectangle())
+        .onTapGesture { }
+        .task {
+            guard lines.count > 1 else { return }
+            // Advancing on a timer rather than on real progress: the work is a
+            // chain of opaque model calls with no milestones to report.
+            while !Task.isCancelled && index < lines.count - 1 {
+                try? await Task.sleep(nanoseconds: 3_200_000_000)
+                if Task.isCancelled { return }
+                if reduceMotion { index += 1 } else {
+                    withAnimation(.easeInOut(duration: 0.35)) { index += 1 }
+                }
             }
         }
     }
