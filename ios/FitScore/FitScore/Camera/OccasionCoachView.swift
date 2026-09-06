@@ -22,11 +22,105 @@ struct OccasionCoachView: View {
     @State private var renderErrors: [UUID: String] = [:]
     @FocusState private var promptFocused: Bool
 
-    private let presets = ["Wedding", "Interview", "Date", "Casual", "Party", "Trip", "Weekend"]
+    /// Occasions, grouped so a long list stays scannable. These are deliberately
+    /// more specific than a bare "Wedding" or "Date" — the coach reads the words
+    /// it is given, and "Wedding guest" and "Black tie" want different clothes.
+    private static let occasionGroups: [(String, [String])] = [
+        ("WORK", ["Interview", "Office day", "Client dinner", "Big presentation", "Work offsite", "Conference"]),
+        ("NIGHTS OUT", ["First date", "Dinner date", "Cocktail bar", "Birthday party", "House party", "Concert"]),
+        ("FORMAL", ["Wedding guest", "Black tie", "Engagement party", "Graduation", "Gallery opening", "Funeral"]),
+        ("EVERYDAY & AWAY", ["Sunday errands", "Coffee run", "Airport day", "City break", "Beach day", "Weekend away"]),
+    ]
+
+    /// Detail chips. The header asks for "room, hour, who is there", and these
+    /// are the three answers worth one tap. They append to the occasion rather
+    /// than replacing it, which is why the field reads as a `·`-joined list.
+    private static let modifierGroups: [(String, [String])] = [
+        ("WHEN", ["Morning", "Afternoon", "Evening", "Late night", "Summer", "Winter"]),
+        ("WHERE", ["Indoors", "Outdoors", "Rooftop", "Beach", "Garden"]),
+        ("DRESS CODE", ["Relaxed", "Smart casual", "Cocktail", "Formal"]),
+    ]
+
+    // MARK: - Prompt as segments
+    //
+    // The placeholder already promises the grammar — "Wedding · outdoor ·
+    // summer, boho…" — so the chips read and write the same `·`-joined list.
+    // The field stays free text; anything typed by hand that does not match a
+    // chip simply survives as its own segment.
+
+    private var segments: [String] {
+        prompt.split(separator: "·")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func writeSegments(_ parts: [String]) {
+        prompt = parts.joined(separator: " · ")
+    }
+
+    /// The occasion is the head of the list, so picking a new one swaps it and
+    /// leaves any detail already added in place.
+    private func setOccasion(_ label: String) {
+        var parts = segments
+        if parts.isEmpty { parts = [label] }
+        else if Self.isOccasion(parts[0]) { parts[0] = label }
+        else { parts.insert(label, at: 0) }
+        writeSegments(parts)
+    }
+
+    private func toggleModifier(_ label: String) {
+        var parts = segments
+        if let idx = parts.firstIndex(where: { $0.caseInsensitiveCompare(label) == .orderedSame }) {
+            parts.remove(at: idx)
+        } else {
+            parts.append(label)
+        }
+        writeSegments(parts)
+    }
+
+    private func isActive(_ label: String) -> Bool {
+        segments.contains { $0.caseInsensitiveCompare(label) == .orderedSame }
+    }
+
+    private static func isOccasion(_ s: String) -> Bool {
+        occasionGroups.contains { $0.1.contains { $0.caseInsensitiveCompare(s) == .orderedSame } }
+    }
+
+    @ViewBuilder
+    private func chip(_ label: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptic.chip()
+            action()
+        } label: {
+            Text(label.uppercased())
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(1.4)
+                .foregroundStyle(active ? Palette.paper : Palette.ink)
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(active ? Palette.ink : Palette.card)
+                .overlay(Capsule().stroke(active ? Color.clear : Palette.hairline, lineWidth: 1))
+                .clipShape(Capsule())
+        }
+    }
+
+    @ViewBuilder
+    private func chipGroup(_ title: String, _ labels: [String], isOccasion: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Eyebrow(text: title)
+            FlowLayout(spacing: 8) {
+                ForEach(labels, id: \.self) { label in
+                    chip(label, active: isActive(label)) {
+                        if isOccasion { setOccasion(label) } else { toggleModifier(label) }
+                    }
+                }
+            }
+        }
+    }
 
     var body: some View {
         ZStack {
             Palette.paper.ignoresSafeArea()
+            VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     header
@@ -38,6 +132,10 @@ struct OccasionCoachView: View {
                     Spacer(minLength: 30)
                 }
                 .padding(20)
+            }
+                if combos.isEmpty && !busy {
+                    composerFooter
+                }
             }
         }
         .task { await refreshFree() }
@@ -74,39 +172,41 @@ struct OccasionCoachView: View {
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Palette.hairline, lineWidth: 1))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(presets, id: \.self) { p in
-                        Button {
-                            Haptic.chip()
-                            prompt = p
-                        } label: {
-                            Text(p.uppercased())
-                                .font(.system(size: 11, weight: .semibold))
-                                .tracking(1.4)
-                                .foregroundStyle(Palette.ink)
-                                .padding(.horizontal, 14).padding(.vertical, 8)
-                                .background(Palette.card)
-                                .overlay(Capsule().stroke(Palette.hairline, lineWidth: 1))
-                                .clipShape(Capsule())
-                        }
-                    }
+            VStack(alignment: .leading, spacing: 18) {
+                ForEach(Array(Self.occasionGroups.enumerated()), id: \.offset) { _, g in
+                    chipGroup(g.0, g.1, isOccasion: true)
+                }
+                Hairline()
+                ForEach(Array(Self.modifierGroups.enumerated()), id: \.offset) { _, g in
+                    chipGroup(g.0, g.1, isOccasion: false)
                 }
             }
 
             if busy {
                 loadingBlock
-            } else {
-                if let error {
-                    Text(error).font(Serif.body(13)).foregroundStyle(Palette.bronze)
-                }
-                PrimaryButton(
-                    title: buttonTitle,
-                    enabled: !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                    action: run
-                )
+            } else if let error {
+                Text(error).font(Serif.body(13)).foregroundStyle(Palette.bronze)
             }
         }
+    }
+
+    /// The primary action is pinned below the scroll view: the chip list is now
+    /// long enough that a button placed after it would sit off-screen on first
+    /// open, which is exactly when it is most likely to be wanted.
+    @ViewBuilder
+    private var composerFooter: some View {
+        VStack(spacing: 0) {
+            Hairline()
+            PrimaryButton(
+                title: buttonTitle,
+                enabled: !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                action: run
+            )
+            .padding(.horizontal, 20)
+            .padding(.top, 14)
+            .padding(.bottom, 8)
+        }
+        .background(Palette.paper)
     }
 
     private var buttonTitle: String {
