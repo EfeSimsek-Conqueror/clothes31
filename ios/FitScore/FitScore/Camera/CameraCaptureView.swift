@@ -285,11 +285,22 @@ final class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelega
     }
 
     /// Decode → center-crop 4:5 → resize longest edge to 2048px → JPEG q=85.
-    static func processJpeg(_ bytes: Data) -> Data? {
+    /// `crop` false keeps the frame exactly as shot.
+    ///
+    /// The 4:5 crop is right for an outfit photo — it is the shape the app
+    /// scores and stores. It is wrong for a magazine cover used as a reference:
+    /// a 2:3 cover loses about a ninth off the top and bottom, which is usually
+    /// where the masthead lives, and the server then composes against a cover
+    /// whose title it never saw.
+    static func processJpeg(_ bytes: Data, crop: Bool = true) -> Data? {
         guard let img = UIImage(data: bytes) else { return nil }
         let normalized = img.normalizedUp()
-        let cropped = normalized.centerCrop45()
-        let resized = cropped.resizeLongestEdge(2048)
+        let framed = crop ? normalized.centerCrop45() : normalized
+        // 1600, not 2048: the server composites with imagescript, whose only
+        // resize is nearest-neighbour, and a large downscale there turns hair
+        // into a plastic silhouette. Landing the server-side factor near 1
+        // keeps the sampling invisible.
+        let resized = framed.resizeLongestEdge(crop ? 2048 : 1600)
         return resized.jpegData(compressionQuality: 0.85)
     }
 }

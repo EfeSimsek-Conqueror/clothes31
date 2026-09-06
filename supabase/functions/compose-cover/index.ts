@@ -363,11 +363,22 @@ function sanitizePullQuote(raw: string): string {
   return s;
 }
 
+/**
+ * An empty masthead means an untitled cover, not a default one.
+ *
+ * This used to read `raw ?? "FITRATER"` and then fall back to "FITRATER" on any
+ * empty result — and `""` is not nullish, so a wearer who deliberately cleared
+ * the title got the app's name printed on their cover anyway. Untitled is a
+ * real choice and it has to survive the sanitiser.
+ *
+ * Returns "" for "give this cover no title". Callers decide what that means.
+ */
 function sanitizeMasthead(raw: string | undefined): string {
-  const s = (raw ?? "FITRATER")
-    .replace(/[^A-Za-z0-9 ]/g, "")
-    .trim()
-    .toUpperCase();
+  if (raw === undefined || raw === null) return "FITRATER";
+  const s = raw.replace(/[^A-Za-z0-9 ]/g, "").trim().toUpperCase();
+  if (raw.trim().length === 0) return "";
+  // Over-length is a mistake rather than an intention, so it falls back; empty
+  // after stripping punctuation (an emoji-only title) does too.
   return s.length > 0 && s.length <= 24 ? s : "FITRATER";
 }
 
@@ -803,6 +814,190 @@ type SwapAttempt = {
   extra?: Record<string, unknown>;
 };
 
+/**
+ * Cut the person out of their own photograph, then place them on the cover.
+ *
+ * This replaces face-swapping onto a stranger's body and regenerating the
+ * subject from a prompt. Both of those produce a person who is *like* the
+ * wearer; a cut-out IS the wearer, because it is their own pixels moved. That
+ * makes identity a property of the pipeline rather than something a verification
+ * pass has to catch after the fact — and it is why the previous chain needed
+ * four attempts and a vision judge and still shipped strangers.
+ *
+ * The cover is the literal canvas. Its composition, its type and its crop are
+ * untouched bytes, so nothing can reframe it.
+ */
+
+const CUTOUT_MIN_COVERAGE = 0.02;
+const CUTOUT_MAX_COVERAGE = 0.92;
+
+interface Placement {
+  bytes: Uint8Array;
+  coverage: number;
+}
+
+/** Alpha bounding box, scanned on a small proxy — a full-size scan is a
+ * per-pixel JS loop over a phone photo, which is a CPU-limit kill. */
+function alphaBBox(cut: Image): { x: number; y: number; w: number; h: number; coverage: number } {
+  const step = Math.max(1, Math.floor(Math.max(cut.width, cut.height) / 96));
+  let minX = cut.width, minY = cut.height, maxX = -1, maxY = -1, hits = 0, seen = 0;
+  for (let y = 0; y < cut.height; y += step) {
+    for (let x = 0; x < cut.width; x += step) {
+      seen++;
+      // imagescript's bitmap is RGBA, row-major, 0-indexed.
+      const a = cut.bitmap[((y * cut.width + x) << 2) + 3];
+      if (a > 24) {
+        hits++;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return { x: 0, y: 0, w: cut.width, h: cut.height, coverage: 0 };
+  const pad = step;
+  const x = Math.max(0, minX - pad);
+  const y = Math.max(0, minY - pad);
+  return {
+    x, y,
+    // Clamped against the source: imagescript's crop clamps the width but not
+    // x + width, and an over-padded box makes it return short rows and
+    // zero-fill the corner.
+    w: Math.min(cut.width - x, maxX - minX + pad * 2),
+    h: Math.min(cut.height - y, maxY - minY + pad * 2),
+    coverage: seen > 0 ? hits / seen : 0,
+  };
+}
+
+/** Segment the subject. Returns a PNG with a real alpha channel. */
+async function cutOutSubject(FAL_KEY: string, source_image_url: string): Promise<string | null> {
+  try {
+    const resp = await fetch("https://fal.run/fal-ai/birefnet/v2", {
+      method: "POST",
+      headers: { Authorization: `Key ${FAL_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        image_url: source_image_url,
+        // The only human-specific checkpoint in the enum.
+        model: "Portrait",
+        // Sent explicitly: the 1024 default segments a 1600px subject at 0.64x
+        // and upsamples the alpha, which is how hair becomes a plastic edge.
+        operating_resolution: "2048x2048",
+        refine_foreground: true,
+        output_format: "png",
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!resp.ok) {
+      console.log("cutout_http", resp.status, (await resp.text()).slice(0, 200));
+      return null;
+    }
+    const js = await resp.json();
+    return js?.image?.url ?? null;
+  } catch (e) {
+    console.log("cutout_error", String(e).slice(0, 200));
+    return null;
+  }
+}
+
+/** The reference cover's typographic system, lifted so it can be rebuilt. */
+interface CoverStyle {
+  masthead: string;
+  meta: string;
+  coverLines: string[];
+  tagline: string;
+  layout: "top" | "center" | "bottom";
+  spec: MoodSpec;
+}
+
+/**
+ * Read the reference as a LAYOUT, not as a canvas.
+ *
+ * This is the correction to how the reference was being used. Pasting the
+ * wearer onto someone else's cover keeps that cover's photograph — its room,
+ * its light, its sofa — and the wearer ends up a cut-out standing in a stranger's
+ * living room. A real vanity cover is the opposite: the wearer's own photograph
+ * fills the page, and what is borrowed from the reference is the typography —
+ * where the masthead sits, how the coverlines stack down the margins, the weight
+ * and case of the name across the bottom.
+ *
+ * So nothing is composited here. The reference contributes a spec; the wearer's
+ * photograph contributes everything you can see of a person. Identity is not
+ * merely preserved, it is never touched.
+ */
+async function readCoverStyle(FAL_KEY: string, coverUrl: string): Promise<CoverStyle | null> {
+  try {
+    const raw = await falCallVision(
+      FAL_KEY,
+      coverUrl,
+      "You read magazine cover layouts and answer only in JSON.",
+      `Describe this magazine cover's typography so it can be rebuilt over a different photograph.\n\n` +
+      `Return ONLY:\n` +
+      `{"masthead":"","meta":"","cover_lines":[""],"tagline":"",` +
+      `"masthead_font":"serif"|"sans","headline_font":"serif"|"sans","cover_line_font":"serif"|"sans",` +
+      `"masthead_tracking":0,"headline_tracking":0,"headline_size":90,` +
+      `"rules":true,"hard_edges":false,"name_position":"top"|"center"|"bottom"}\n\n` +
+      `masthead: the publication title, verbatim and in its own case.\n` +
+      `meta: the issue line under or beside it, such as "Winter 2021". Empty if there is none.\n` +
+      `cover_lines: the secondary coverlines, one short string each — the headline ` +
+      `part only, NOT its sub-line. Up to four, at most 22 characters each; shorten ` +
+      `by dropping words rather than by abbreviating.\n` +
+      `tagline: the small line under the featured name, verbatim. Empty if there is none.\n` +
+      `The three font fields: "sans" for a grotesque or any heavy condensed face, ` +
+      `"serif" for anything with brackets or thin strokes.\n` +
+      `masthead_tracking and headline_tracking: 0 for tight, up to 18 for widely letterspaced.\n` +
+      `headline_size: roughly how tall the featured name is as a fraction of the page height, ` +
+      `multiplied by 1000. A name filling a fifth of the page is 200.\n` +
+      `rules: are there hairline rules separating blocks. hard_edges: is the type squared off ` +
+      `and blocky rather than delicate.\n` +
+      `name_position: where the featured person's name sits on the page.`,
+    );
+    const a = raw.indexOf("{"), b = raw.lastIndexOf("}");
+    if (a < 0 || b <= a) return null;
+    const j = JSON.parse(raw.slice(a, b + 1));
+
+    const font = (v: unknown): "serif" | "sans" => (String(v) === "sans" ? "sans" : "serif");
+    const num = (v: unknown, lo: number, hi: number, dflt: number) => {
+      const n = Number(v);
+      return isFinite(n) ? Math.max(lo, Math.min(hi, n)) : dflt;
+    };
+    const pos = String(j?.name_position ?? "");
+    return {
+      masthead: String(j?.masthead ?? "").slice(0, 24),
+      meta: String(j?.meta ?? "").slice(0, 40),
+      coverLines: (Array.isArray(j?.cover_lines) ? j.cover_lines : [])
+        // Capped hard, and this is a compute limit rather than a taste one.
+        // `drawText` rasterises one glyph at a time whenever tracking is set,
+        // and the coverline rows are drawn with tracking 2 — so a line's cost
+        // is its character count, multiplied again by the halo passes. Three
+        // 44-character lines took the isolate over its limit and killed the
+        // request; the working path draws about a third of that.
+        .map((x: unknown) => String(x).split(" — ")[0].slice(0, 22))
+        .filter(Boolean).slice(0, 4),
+      tagline: String(j?.tagline ?? "").slice(0, 60),
+      layout: pos === "top" || pos === "center" ? pos : "bottom",
+      spec: {
+        mastheadFont: font(j?.masthead_font),
+        mastheadTracking: num(j?.masthead_tracking, 0, 20, 10),
+        headlineFont: font(j?.headline_font),
+        headlineTracking: num(j?.headline_tracking, 0, 20, 2),
+        // The read is a fraction of page height times 1000; the renderer wants
+        // pixels on its own 1920-tall canvas. Clamped hard afterwards: the
+        // unclamped conversion reached ~500px, and a headline that size is
+        // several hundred glyph rasterisations at full canvas width.
+        headlineSize: Math.max(70, Math.min(150, Math.round(num(j?.headline_size, 40, 200, 90) * 0.9))),
+        coverLineFont: font(j?.cover_line_font),
+        grain: false,
+        rules: j?.rules !== false,
+        hardEdges: j?.hard_edges === true,
+      },
+    };
+  } catch (e) {
+    console.log("cover_style_read_failed", String(e).slice(0, 160));
+    return null;
+  }
+}
+
 async function runReferenceSwapChain(
   FAL_KEY: string,
   reference_cover_url: string,
@@ -1208,6 +1403,25 @@ function wrapByWidth(text: string, maxWidth: number, size: number, font: "serif"
   return lines.slice(0, maxLines);
 }
 
+// Per-glyph rasterisation is what makes tracked text expensive: a four-row
+// coverline block is ~180 `renderText` calls, but only ~40 distinct glyphs.
+// Caching by (font, size, colour, char) collapses the duplicates. The cache is
+// module-level so it also survives across rows within one render; it is cleared
+// per request by `resetGlyphCache` so a long-lived isolate cannot grow forever.
+// deno-lint-ignore no-explicit-any
+const glyphCache = new Map<string, any>();
+export function resetGlyphCache(): void { glyphCache.clear(); }
+// deno-lint-ignore no-explicit-any
+function glyph(fontBytes: Uint8Array, which: string, size: number, ch: string, col: number, layout: any): any {
+  const key = `${which}|${size}|${col}|${ch}`;
+  const hit = glyphCache.get(key);
+  if (hit !== undefined) return hit;
+  let img: any = null;
+  try { img = Image.renderText(fontBytes, size, ch, col, layout); } catch { img = null; }
+  if (glyphCache.size < 2000) glyphCache.set(key, img);
+  return img;
+}
+
 function drawText(
   canvas: any,
   fonts: { serif: Uint8Array; sans: Uint8Array },
@@ -1246,11 +1460,11 @@ function drawText(
         totalW += spaceAdvance;
         continue;
       }
-      try {
-        const g = Image.renderText(fontBytes, size, ch, col, layout);
+      const g = glyph(fontBytes, font, size, ch, col, layout);
+      if (g) {
         glyphs.push({ img: g, w: g.width });
         totalW += g.width;
-      } catch {
+      } else {
         glyphs.push({ img: null, w: spaceAdvance });
         totalW += spaceAdvance;
       }
@@ -1322,15 +1536,33 @@ async function renderFullCover(
   const headlineLineH = Math.floor(headlineSize * 1.05);
   const headlineBlockH = headlineLineH * headlineLines.length;
 
-  let headlineTopY: number;
-  if (layout === "top") headlineTopY = Math.floor(H * 0.72) - headlineBlockH;
-  else if (layout === "bottom") headlineTopY = Math.floor(H * 0.30);
-  else headlineTopY = Math.floor(H * 0.58);
-
   const quoteSize = Math.max(22, Math.floor(headlineSize * 0.28));
   const quoteLineH = Math.floor(quoteSize * 1.3);
   const quoteLines = pullQuote ? wrapByWidth(pullQuote, W - 180, quoteSize, "serif", 2) : [];
+
+  // Headline, pull quote and coverlines are measured as one stack and placed as
+  // one block, so they can never collide with each other or with the masthead.
+  // Fixed fractional Y positions used to overlap whenever the borrowed layout
+  // put the masthead and the headline on the same side of the page.
+  const clSize = coverLines.length > 3 ? 34 : 40;
+  const clGap = Math.floor(clSize * 2.0);
+  const clBlockH = coverLines.length ? clGap * coverLines.length : 0;
+  const quoteBlockH = quoteLines.length ? quoteLineH * quoteLines.length : 0;
+  const stackH = headlineBlockH +
+    (quoteLines.length ? 20 + quoteBlockH : 0) +
+    (coverLines.length ? 44 + clBlockH : 0);
+
+  // The masthead band is whatever the masthead plus its meta line occupies.
+  const mastheadBandH = Math.floor(mastheadSize * 0.95) + 20 + metaSize + 40;
+  let stackTop: number;
+  if (layout === "bottom") stackTop = mastheadTopY - 60 - stackH;
+  else if (layout === "center") stackTop = mastheadTopY + mastheadBandH + 60;
+  else stackTop = Math.max(mastheadTopY + mastheadBandH + 60, H - 200 - stackH);
+  stackTop = Math.max(80, Math.min(stackTop, H - 160 - stackH));
+
+  const headlineTopY = stackTop;
   const quoteTopY = headlineTopY + headlineBlockH + 20;
+  const clStartY = quoteTopY + quoteBlockH + (quoteLines.length ? 44 : 24);
 
   const topInk = topLum < 0.5 ? CREAM : INK;
   const bottomInk = bottomLum < 0.5 ? CREAM : INK;
@@ -1348,6 +1580,7 @@ async function renderFullCover(
   }
 
   const fonts = await loadFonts();
+  resetGlyphCache();
 
   const topInkColor = hexToColor(topInk);
   const topAccentColor = hexToColor(topAccent);
@@ -1368,9 +1601,6 @@ async function renderFullCover(
       quoteSize, "serif", bottomInkColor, "center", 0);
   }
 
-  const clSize = coverLines.length > 3 ? 34 : 40;
-  const clStartY = Math.floor(H * 0.32);
-  const clGap = Math.floor(clSize * 2.0);
   for (let i = 0; i < coverLines.length; i++) {
     const y = clStartY + i * clGap;
     const rowIsDark = y < H * 0.55 ? topLum < 0.5 : bottomLum < 0.5;
@@ -1634,13 +1864,78 @@ Deno.serve(async (req: Request) => {
       subject_upscaled_preview: effectiveSubjectUrl.slice(0, 80),
     }));
 
-    const chain = await runReferenceSwapChain(
-      FAL_KEY,
-      reference_cover_url,
-      effectiveSubjectUrl,
-      userPromptSuffix,
-      refBytesHash,
-    );
+    // The reference is a LAYOUT, not a canvas.
+    //
+    // Rebuilding beat compositing here, and the difference is visible in one
+    // glance: a paste puts the wearer in the reference's room, on the
+    // reference's sofa, under the reference's light. A rebuild keeps the
+    // wearer's own photograph — which is what a real vanity cover is — and
+    // borrows only where the masthead sits, how the coverlines stack, and how
+    // the name is set across the bottom.
+    //
+    // Nothing generative touches the photograph, so the face on the cover is
+    // the face in the camera roll, unconditionally.
+    let rebuiltBytes: Uint8Array | null = null;
+    let styleRead: CoverStyle | null = null;
+    try {
+      const [style, photoBytes] = await Promise.all([
+        readCoverStyle(FAL_KEY, reference_cover_url),
+        fetch(effectiveSubjectUrl, { signal: AbortSignal.timeout(30_000) })
+          .then(async (r) => (r.ok ? new Uint8Array(await r.arrayBuffer()) : null))
+          .catch(() => null),
+      ]);
+      styleRead = style;
+      if (style && photoBytes) {
+        // The wearer's own title wins over the publication's; an empty one
+        // leaves the reference's masthead in place, which is the point of
+        // borrowing a layout.
+        const ownMasthead = sanitizeMasthead(
+          (body?.custom_masthead ? String(body.custom_masthead) : "") ||
+          (body?.masthead ? String(body.masthead) : "") || undefined,
+        );
+        const nameLine = sanitizeHeadline(
+          (body?.custom_headline ? String(body.custom_headline) : "") ||
+          (body?.user_name ? String(body.user_name) : "") || "",
+        );
+        const tagline = sanitizeHeadline(
+          (body?.custom_pull_quote ? String(body.custom_pull_quote) : "") || style.tagline,
+        );
+        rebuiltBytes = await renderFullCover(
+          photoBytes,
+          ownMasthead || style.masthead,
+          style.meta,
+          nameLine,
+          tagline,
+          style.coverLines,
+          INK,
+          style.layout,
+          style.spec,
+          true,
+          outfit_id ?? user_id,
+        );
+      }
+    } catch (e) {
+      console.log("rebuild_failed", String(e).slice(0, 240));
+      rebuiltBytes = null;
+    }
+    console.log("branch_a_rebuild", JSON.stringify({
+      style: Boolean(styleRead),
+      lines: styleRead?.coverLines.length ?? 0,
+      rebuilt: Boolean(rebuiltBytes),
+    }));
+
+    // The old swap chain is the safety net now: it answers only when the layout
+    // could not be read at all.
+    const chain = rebuiltBytes
+      ? { url: "", bytes: rebuiltBytes, strategy: "style-rebuild",
+          attempts: [], content_policy_error: false }
+      : await runReferenceSwapChain(
+        FAL_KEY,
+        reference_cover_url,
+        effectiveSubjectUrl,
+        userPromptSuffix,
+        refBytesHash,
+      );
 
     console.log("branch_a_swap_chain", JSON.stringify({
       chosen_strategy: chain.strategy,
@@ -1660,7 +1955,9 @@ Deno.serve(async (req: Request) => {
           "The photo you uploaded was flagged by our image model's safety filter. Try a photo with a shirt on.",
       });
     }
-    if (!chain.url || chain.bytes.length === 0) {
+    // The URL is only a handle on a fal render. The cut-out path composites
+    // locally and has none, so the bytes are the thing that decides.
+    if (chain.bytes.length === 0 || (!chain.url && !rebuiltBytes)) {
       // v33: hard failure. Do NOT ship the reference untouched.
       return json(200, {
         cover_url: null,
@@ -1685,8 +1982,11 @@ Deno.serve(async (req: Request) => {
     // We use overlayMinimalChrome which paints a masked band + text at the top.
     const userMasthead = (body?.custom_masthead ? String(body.custom_masthead) : "")
       || (body?.masthead ? String(body.masthead) : "");
-    let userMastheadOverlayApplied = false;
-    if (userMasthead && userMasthead.trim().length > 0) {
+    // Already drawn under the subject on the cut-out path; repeating it here
+    // is exactly the layering this change exists to fix.
+    // The rebuild already set the masthead as part of the layout.
+    let userMastheadOverlayApplied = Boolean(rebuiltBytes);
+    if (!rebuiltBytes && userMasthead && userMasthead.trim().length > 0) {
       try {
         finalBytes = await overlayMinimalChrome(finalBytes, sanitizeMasthead(userMasthead));
         userMastheadOverlayApplied = true;
@@ -1697,9 +1997,14 @@ Deno.serve(async (req: Request) => {
 
     // v24 Tier 2: verify chrome survived. If nano-banana stripped it, overlay
     // a minimal masthead + fitrater.ai as a safety net.
+    //
+    // Skipped entirely on the cut-out path: the cover is the untouched canvas
+    // there, so its own type cannot have been stripped, and there is no fal URL
+    // to hand the checker anyway.
     let chromeStripped = false;
     let fallbackApplied = false;
     try {
+      if (rebuiltBytes) throw new Error("rebuild_sets_its_own_type");
       const chk = await checkChromePresent(FAL_KEY, renderedUrl);
       chromeStripped = !chk.has_text && !chk.has_masthead;
       // Skip the fallback if we already overlaid the user's masthead above.
@@ -1779,7 +2084,11 @@ Deno.serve(async (req: Request) => {
       vol_number,
       cover_id: inserted?.id ?? null,
       used_template: !!templateRow,
-    });
+      // Which path produced the frame: the borrowed-typography rebuild or the
+      // reference-swap fallback. Surfaced so a silent stage failure is visible
+      // instead of only showing up as a stranger in the background.
+      built: rebuiltBytes ? "style-rebuild" : "swap-chain",
+});
   }
 
   // =========================================================================

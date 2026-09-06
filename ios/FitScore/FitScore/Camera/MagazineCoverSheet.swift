@@ -33,7 +33,11 @@ struct MagazineCoverSheet: View {
 
     // Options
     @State private var mood: String = ""
-    @State private var masthead: String = "FITRATER"
+    /// Empty by default. "FITRATER" is shown greyed as an example, not as a
+    /// value: a cover that always arrives pre-titled reads as the app's cover
+    /// rather than the wearer's, and most people never notice they could
+    /// change it.
+    @State private var masthead: String = ""
     @State private var showMastheadEditor = false
 
     @State private var busy = false
@@ -121,7 +125,9 @@ struct MagazineCoverSheet: View {
         .onChange(of: referencePicker) { _, item in
             Task {
                 if let item, let d = try? await item.loadTransferable(type: Data.self) {
-                    setReference(CameraModel.processJpeg(d) ?? d)
+                    // Uncropped: the reference IS the canvas now, and a 4:5
+                    // crop of a 2:3 cover takes the masthead off it.
+                    setReference(CameraModel.processJpeg(d, crop: false) ?? d)
                 }
             }
         }
@@ -254,9 +260,12 @@ struct MagazineCoverSheet: View {
                         Text("MASTHEAD")
                             .font(.system(size: 10, weight: .semibold)).tracking(1.5)
                             .foregroundStyle(Palette.bronze)
-                        Text(masthead)
+                        // Greyed when empty: it reads as the example it is,
+                        // and turns to ink the moment the wearer names their
+                        // own title.
+                        Text(masthead.isEmpty ? "FITRATER" : masthead)
                             .font(Serif.display(16))
-                            .foregroundStyle(Palette.ink)
+                            .foregroundStyle(masthead.isEmpty ? Palette.muted : Palette.ink)
                     }
                     Spacer()
                     Image(systemName: "pencil").font(.system(size: 12)).foregroundStyle(Palette.muted)
@@ -443,7 +452,10 @@ struct MagazineCoverSheet: View {
             .overlay(
                 Group {
                     if let image {
-                        Image(uiImage: image).resizable().scaledToFill()
+                        // Fit, not fill: these two tiles are how you check you
+                        // picked the right photo, and a fill crop hides the
+                        // head or the hem — exactly what you are checking for.
+                        Image(uiImage: image).resizable().scaledToFit()
                     } else {
                         VStack(spacing: 4) {
                             Text("+")
@@ -810,7 +822,7 @@ private struct MastheadEditorSheet: View {
             Text("What's on the top of your cover?")
                 .font(Serif.display(20))
                 .foregroundStyle(Palette.ink)
-            Text("Default is FITRATER. Keep it short — 3-10 chars.")
+            Text("Leave it empty and the cover carries no title. Keep it short — 3-10 chars.")
                 .font(Serif.italic(13))
                 .foregroundStyle(Palette.muted)
 
@@ -827,7 +839,7 @@ private struct MastheadEditorSheet: View {
             Spacer()
 
             HStack(spacing: 8) {
-                Button(action: { masthead = "FITRATER"; onClose() }) {
+                Button(action: { masthead = ""; onClose() }) {
                     OutlinePillButton(title: "Reset")
                 }
                 PrimaryButton(title: "Use this", enabled: !text.trimmingCharacters(in: .whitespaces).isEmpty) {
