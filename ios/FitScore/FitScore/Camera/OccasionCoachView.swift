@@ -58,21 +58,21 @@ struct OccasionCoachView: View {
         prompt = parts.joined(separator: " · ")
     }
 
-    /// The occasion is the head of the list, so picking a new one swaps it and
-    /// leaves any detail already added in place.
-    private func setOccasion(_ label: String) {
-        var parts = segments
-        if parts.isEmpty { parts = [label] }
-        else if Self.isOccasion(parts[0]) { parts[0] = label }
-        else { parts.insert(label, at: 0) }
-        writeSegments(parts)
-    }
+    /// A brief is usually more than one word — "wedding guest, outdoors,
+    /// afternoon" — so every chip toggles and several can be on at once. The
+    /// ceiling exists because past about six the brief stops being a brief:
+    /// the coach starts averaging contradictory instructions instead of
+    /// following them.
+    private static let maxSegments = 6
 
-    private func toggleModifier(_ label: String) {
+    private var canAddMore: Bool { segments.count < Self.maxSegments }
+
+    private func toggle(_ label: String) {
         var parts = segments
         if let idx = parts.firstIndex(where: { $0.caseInsensitiveCompare(label) == .orderedSame }) {
             parts.remove(at: idx)
         } else {
+            guard parts.count < Self.maxSegments else { return }
             parts.append(label)
         }
         writeSegments(parts)
@@ -82,15 +82,15 @@ struct OccasionCoachView: View {
         segments.contains { $0.caseInsensitiveCompare(label) == .orderedSame }
     }
 
-    private static func isOccasion(_ s: String) -> Bool {
-        occasionGroups.contains { $0.1.contains { $0.caseInsensitiveCompare(s) == .orderedSame } }
-    }
-
     @ViewBuilder
-    private func chip(_ label: String, active: Bool, action: @escaping () -> Void) -> some View {
+    private func chip(_ label: String) -> some View {
+        let active = isActive(label)
+        // At the ceiling the unpicked chips dim rather than disappear, so the
+        // limit reads as "that is enough" instead of as a broken tap.
+        let blocked = !active && !canAddMore
         Button {
             Haptic.chip()
-            action()
+            toggle(label)
         } label: {
             Text(label.uppercased())
                 .font(.system(size: 11, weight: .semibold))
@@ -101,20 +101,32 @@ struct OccasionCoachView: View {
                 .overlay(Capsule().stroke(active ? Color.clear : Palette.hairline, lineWidth: 1))
                 .clipShape(Capsule())
         }
+        .disabled(blocked)
+        .opacity(blocked ? 0.35 : 1)
     }
 
     @ViewBuilder
-    private func chipGroup(_ title: String, _ labels: [String], isOccasion: Bool) -> some View {
+    private func chipGroup(_ title: String, _ labels: [String]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Eyebrow(text: title)
             FlowLayout(spacing: 8) {
                 ForEach(labels, id: \.self) { label in
-                    chip(label, active: isActive(label)) {
-                        if isOccasion { setOccasion(label) } else { toggleModifier(label) }
-                    }
+                    chip(label)
                 }
             }
         }
+    }
+
+    /// Sits above the chips so the ceiling is known before it is hit.
+    @ViewBuilder
+    private var pickCounter: some View {
+        let n = segments.count
+        Text(n == 0
+             ? "PICK UP TO \(Self.maxSegments)"
+             : "\(n) OF \(Self.maxSegments) PICKED")
+            .font(.system(size: 9.5, weight: .semibold))
+            .tracking(1.4)
+            .foregroundStyle(canAddMore ? Palette.muted : Palette.bronze)
     }
 
     var body: some View {
@@ -173,12 +185,13 @@ struct OccasionCoachView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
 
             VStack(alignment: .leading, spacing: 18) {
+                pickCounter
                 ForEach(Array(Self.occasionGroups.enumerated()), id: \.offset) { _, g in
-                    chipGroup(g.0, g.1, isOccasion: true)
+                    chipGroup(g.0, g.1)
                 }
                 Hairline()
                 ForEach(Array(Self.modifierGroups.enumerated()), id: \.offset) { _, g in
-                    chipGroup(g.0, g.1, isOccasion: false)
+                    chipGroup(g.0, g.1)
                 }
             }
 
