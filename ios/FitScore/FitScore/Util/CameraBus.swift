@@ -43,3 +43,23 @@ final class VersusBus {
 
     func clear() { aBytes = nil; bBytes = nil }
 }
+
+/// Fires whenever the closet gains a piece.
+///
+/// Try-on shows a strip of Studio pieces and loads it once, when the screen
+/// appears. Designing a piece opens Studio *over* that screen, so coming back
+/// does not re-run the load and the new piece is missing from a list it plainly
+/// belongs in. Observers watch `revision` and reload.
+///
+/// Bumped inside `Repo.insertClosetItem` rather than at the call sites: five
+/// different screens write pieces, and any of them could forget.
+@MainActor
+final class ClosetBus: ObservableObject {
+    static let shared = ClosetBus()
+    private init() {}
+
+    /// Monotonic. The value carries no meaning; only that it changed does.
+    @Published private(set) var revision = 0
+
+    func changed() { revision &+= 1 }
+}

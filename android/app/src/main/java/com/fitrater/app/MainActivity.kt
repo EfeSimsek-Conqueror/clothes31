@@ -1,15 +1,22 @@
 package com.fitrater.app
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -70,8 +77,38 @@ private const val PAGE_HOME = 0
 private const val PAGE_STUDIO = 1
 private const val PAGE_JOURNAL = 2
 
+/**
+ * Cream (#F3EEE4 — HemColors.Paper) scrim drawn behind the system bars on API levels that still
+ * need an opaque bar colour (< 29). On 29+ the bars stay transparent and the app's own cream
+ * surface shows through.
+ */
+private const val BAR_SCRIM_LIGHT = 0xFFF3EEE4.toInt()
+
+/** Fallback scrim for API levels where dark nav-bar icons aren't supported (26–28). */
+private const val BAR_SCRIM_DARK = 0x801B1B1B.toInt()
+
+/**
+ * Edge-to-edge is only turned on from API 30. Below that the platform reports no separate `ime`
+ * inset, and switching the decor off makes the window stop resizing for the keyboard too — the
+ * composer of any text screen would sit behind it with no inset available to correct for. On 26–29
+ * we therefore keep the classic decor behaviour (`adjustResize` in the manifest), which insets the
+ * content for both the system bars and the keyboard by itself.
+ */
+internal val EDGE_TO_EDGE = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Edge-to-edge is enforced from API 35 (targetSdk 36). The app renders a single cream
+        // (HemColors.Paper) surface in light colours only — see FitraterApp's hard-coded
+        // lightColorScheme — so system bar icons must always be dark. SystemBarStyle.light(...)
+        // pins that; SystemBarStyle.auto(...) would flip icons to white when the device is in dark
+        // mode, making them invisible on our cream background.
+        if (EDGE_TO_EDGE) {
+            enableEdgeToEdge(
+                statusBarStyle = SystemBarStyle.light(BAR_SCRIM_LIGHT, BAR_SCRIM_DARK),
+                navigationBarStyle = SystemBarStyle.light(BAR_SCRIM_LIGHT, BAR_SCRIM_DARK),
+            )
+        }
         super.onCreate(savedInstanceState)
         // Global uncaught exception logger — always log; always rethrow to preserve default behavior.
         val prev = Thread.getDefaultUncaughtExceptionHandler()
@@ -127,7 +164,7 @@ fun FitraterApp() {
             var showHelpPrivacySheet by remember { mutableStateOf(false) }
             var showCameraMenu by remember { mutableStateOf(false) }
             var placeholderMessage by remember { mutableStateOf<String?>(null) }
-            // Context tag threaded into the paywall so it can render a feature-specific hero.
+            // Context tag threaded into the credits sheet so it can render a feature-specific hero.
             var paywallContext by remember { mutableStateOf<String?>(null) }
             val openPaywall: (String?) -> Unit = { ctx ->
                 paywallContext = ctx
@@ -186,12 +223,31 @@ fun FitraterApp() {
             Scaffold(
                 containerColor = HemColors.Paper,
                 snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+                // The Box below owns insets; letting the Scaffold pad as well would double them.
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
             ) { padding ->
+                // This is the ONE place window insets are turned into padding. safeDrawing covers
+                // system bars + display cutout + the keyboard in a single inset, which is what makes
+                // this correct on both inset generations: below API 30 the keyboard is folded into
+                // the system-bar inset, from API 30 it is a separate ime inset. Padding with
+                // systemBars and then adding imePadding() double-counts the keyboard on API 29 and
+                // collapses the content band to nothing. Everything under the NavHost (including
+                // AppShell's nested Scaffold) sees the insets as already consumed.
                 Box(
                     Modifier
                         .fillMaxSize()
                         .background(HemColors.Paper)
-                        .padding(padding),
+                        .then(
+                            if (EDGE_TO_EDGE) {
+                                Modifier
+                                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                                    .consumeWindowInsets(WindowInsets.safeDrawing)
+                            } else {
+                                // Decor still fits system windows here: the content view is already
+                                // inset for bars and keyboard, so padding again would double it.
+                                Modifier
+                            },
+                        ),
                 ) {
                     NavHost(navController = nav, startDestination = initialStart) {
                         composable(Route.Splash) {
@@ -207,9 +263,16 @@ fun FitraterApp() {
                             })
                         }
                         composable(Route.Paywall) {
-                            PaywallScreen(onContinue = {
-                                nav.navigate(Route.Shell) { popUpTo(0) { inclusive = true } }
-                            })
+                            PaywallScreen(
+                                onDone = {
+                                    nav.navigate(Route.Shell) { popUpTo(0) { inclusive = true } }
+                                },
+                                onDismiss = {
+                                    if (!nav.popBackStack()) {
+                                        nav.navigate(Route.Shell) { popUpTo(0) { inclusive = true } }
+                                    }
+                                },
+                            )
                         }
                         composable(Route.Shell) {
                             AppShell(
@@ -217,9 +280,11 @@ fun FitraterApp() {
                                 onOpenScoreSheet = { showCameraMenu = true },
                                 onOpenDetail = { id -> nav.navigate(Route.scoreDetail(id)) },
                                 onOpenCreateStudio = { nav.navigate(Route.StudioCreate) },
+                                onOpenOutfitWizard = { nav.navigate(Route.StudioOutfit) },
                                 onOpenCoverTemplate = { nav.navigate(Route.CoverTemplate) },
                                 onOpenYou = { showYouSheet = true },
                                 onOpenCamera = { nav.navigate(Route.Camera) },
+                                onOpenChat = { nav.navigate(Route.StylistChat) },
                                 onOpenCredits = { showCreditsSheet = true },
                                 onOpenPaywall = openPaywall,
                                 onDismissKeyboard = {
@@ -254,6 +319,18 @@ fun FitraterApp() {
                                 editingPieceId = editReq?.item?.id,
                                 presetType = presetType,
                                 presetReferenceUrl = editReq?.referenceUrl,
+                            )
+                        }
+                        // Studio 2.0 — sequential full-outfit wizard.
+                        composable(Route.StudioOutfit) {
+                            com.fitrater.app.ui.screens.studio.OutfitWizardScreen(
+                                onClose = {
+                                    nav.navigate(Route.Shell) {
+                                        popUpTo(Route.Shell) { inclusive = false }
+                                        launchSingleTop = true
+                                    }
+                                },
+                                onOpenPaywall = { nav.navigate(Route.Paywall) },
                             )
                         }
                         composable(Route.ScoreSheet) {
@@ -358,15 +435,9 @@ fun FitraterApp() {
                                 onClose = { nav.popBackStack() },
                             )
                         }
-                        composable(Route.Roast) {
-                            com.fitrater.app.ui.screens.camera.RoastScreen(
-                                isPro = isPro,
+                        composable(Route.StylistChat) {
+                            com.fitrater.app.ui.screens.chat.StylistChatScreen(
                                 onClose = { nav.popBackStack() },
-                                onOpenPaywall = {
-                                    nav.popBackStack()
-                                    openPaywall("brutal")
-                                },
-                                onOpenCamera = { nav.navigate(Route.Camera) },
                             )
                         }
                         composable(Route.WeeklyLetter) {
@@ -425,10 +496,6 @@ fun FitraterApp() {
                                 showYouSheet = false
                                 showCreditsSheet = true
                             }
-                        },
-                        onOpenPaywall = {
-                            showYouSheet = false
-                            openPaywall("brutal")
                         },
                         onOpenStyleProfile = {
                             showYouSheet = false
@@ -530,9 +597,9 @@ fun FitraterApp() {
                             showCameraMenu = false
                             nav.navigate(Route.Versus)
                         },
-                        onPickRoast = {
+                        onPickChat = {
                             showCameraMenu = false
-                            nav.navigate(Route.Roast)
+                            nav.navigate(Route.StylistChat)
                         },
                         onPickDecode = {
                             showCameraMenu = false
@@ -570,9 +637,11 @@ private fun AppShell(
     onOpenScoreSheet: () -> Unit,
     onOpenDetail: (String) -> Unit,
     onOpenCreateStudio: () -> Unit,
+    onOpenOutfitWizard: () -> Unit,
     onOpenCoverTemplate: () -> Unit,
     onOpenYou: () -> Unit,
     onOpenCamera: () -> Unit,
+    onOpenChat: () -> Unit,
     onOpenCredits: () -> Unit,
     onOpenPaywall: (String?) -> Unit,
     onDismissKeyboard: () -> Unit,
@@ -589,6 +658,9 @@ private fun AppShell(
 
     Scaffold(
         containerColor = HemColors.Paper,
+        // The outer Scaffold in FitraterApp already applied (and consumed) the system bar insets.
+        // Zeroing them here keeps this Scaffold's content padding to the bottom bar height only.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             HemBottomNav(
                 currentRoute = currentTabRoute,
@@ -634,6 +706,7 @@ private fun AppShell(
                             scope.launch { pagerState.animateScrollToPage(PAGE_STUDIO) }
                         },
                         onOpenCamera = onOpenCamera,
+                        onOpenChat = onOpenChat,
                         onOpenCredits = onOpenCredits,
                         onOpenPaywall = { onOpenPaywall("letter") },
                     )
@@ -644,6 +717,7 @@ private fun AppShell(
                             onOpenCreateStudio()
                         },
                         onCreateCoverTemplate = onOpenCoverTemplate,
+                        onCreateOutfit = onOpenOutfitWizard,
                     )
                     PAGE_JOURNAL -> JournalScreen(onOpenDetail = onOpenDetail)
                 }

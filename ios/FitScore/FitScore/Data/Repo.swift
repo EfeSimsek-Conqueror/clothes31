@@ -215,14 +215,23 @@ final class Repo {
         return decodeOutfitsSafe(resp.data).first
     }
 
+    /// The user's running average, computed WITHIN one scoring family.
+    ///
+    /// v4 caps only ever subtract, so a v4 headline and a v3 mean are not the
+    /// same measurement and averaging them together is a category error: the
+    /// first v4 score a user ever gets would read "below your average" for a
+    /// look that is completely fine. The family of the most recent scored look
+    /// wins, and everything from the other engine is excluded.
     func averageScore() async throws -> Double? {
         let list = try await outfits(limit: 50)
-        let scored = list
-            .filter { $0.kind == nil || $0.kind == "score" || $0.kind == "user_scan" }
-            .compactMap { $0.score }
+        let scored = list.filter { $0.kind == nil || $0.kind == "score" || $0.kind == "user_scan" }
+        guard let family = scored.first(where: { ($0.displayScore ?? 0) > 0 })?.scoringFamily else { return nil }
+        let values = scored
+            .filter { $0.scoringFamily == family }
+            .compactMap { $0.displayScore }
             .filter { $0 > 0 }
-        guard !scored.isEmpty else { return nil }
-        return scored.reduce(0, +) / Double(scored.count)
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
     }
 
     func outfitsInWindow(startIso: String, endIso: String, limit: Int = 3) async throws -> [Outfit] {
@@ -239,6 +248,27 @@ final class Repo {
         return decodeOutfitsSafe(resp.data)
     }
 
+    /// Most recent A vs B row. The winner's photo is the row's `photo_path`;
+    /// the pair, the totals and the breakdown live in `signals.versus`.
+    func latestVersus() async throws -> Outfit? {
+        guard let uid = userId else { return nil }
+        let resp = try await Supa.client
+            .from("outfits")
+            .select()
+            .eq("user_id", value: uid)
+            .eq("kind", value: "versus")
+            .order("created_at", ascending: false)
+            .limit(1)
+            .execute()
+        return decodeOutfitsSafe(resp.data).first
+    }
+
+    /// Every outfit read in this file uses a bare `.select()`, so the v4 columns
+    /// (intake, axes, score_breakdown, dress_code, presence_check, lever,
+    /// caveats, pieces, rubric_id, scoring_version, rescore_count) come back
+    /// without a column list to maintain. `OutfitInsert` carries the same set on
+    /// the way in — a row saved without `scoring_version` would later be read as
+    /// v3 and have its headline re-averaged out of the legacy subscores.
     func insertOutfit(_ o: OutfitInsert) async throws -> Outfit {
         let inserted: [Outfit] = try await Supa.client
             .from("outfits")
@@ -288,6 +318,9 @@ final class Repo {
             .execute()
             .value
         guard let first = inserted.first else { throw RepoError.notFound }
+        // Announced here, not at the call sites: five screens write pieces and
+        // any of them could forget. Anything showing a closet list reloads.
+        await MainActor.run { ClosetBus.shared.changed() }
         return first
     }
 
@@ -664,16 +697,24 @@ final class Repo {
         }
     }
 
-    func tryOnPiece(personUrl: String, garmentUrl: String, category: String = "auto") async throws -> GenerateResponse {
+    func tryOnPiece(
+        personUrl: String,
+        garmentUrl: String,
+        category: String = "auto",
+        /// One piece off a multi-item plate, by name. Empty means the whole look.
+        only: String = ""
+    ) async throws -> GenerateResponse {
         struct Payload: Encodable {
             let person_url: String
             let garment_url: String
+            let only: String
             let category: String
             let mode: String
         }
         let payload = Payload(
             person_url: personUrl,
             garment_url: garmentUrl,
+            only: only,
             category: category,
             mode: "quality"
         )
@@ -1087,7 +1128,7 @@ final class Repo {
         let piecesCount = pieces.count
         let outfits = (try? await self.outfits(limit: 500)) ?? []
         let looksCount = outfits.count
-        let best = outfits.compactMap { $0.score }.max()
+        let best = outfits.compactMap { $0.displayScore }.max()
 
         var creditsUsedReal = 0
         if let uid = userId {
@@ -1118,16 +1159,20 @@ final class Repo {
             cursor = cal.dateComponents([.year, .month, .day], from: prev)
         }
 
-        // Month delta: this month's avg score vs personal all-time avg.
+        // Month delta: this month's avg score vs personal all-time avg. Both
+        // sides are restricted to a single scoring family — see `averageScore`;
+        // a v4 headline and a v3 mean are not the same measurement.
         let today = Date()
         let todayComps = cal.dateComponents([.year, .month], from: today)
-        let thisMonth: [Double] = outfits.compactMap { o -> Double? in
+        let family = outfits.first(where: { ($0.displayScore ?? 0) > 0 })?.scoringFamily
+        let sameEngine = outfits.filter { $0.scoringFamily == family }
+        let thisMonth: [Double] = sameEngine.compactMap { o -> Double? in
             guard let raw = o.created_at, let d = iso.date(from: raw) ?? ISO8601DateFormatter().date(from: raw) else { return nil }
             let c = cal.dateComponents([.year, .month], from: d)
             guard c.year == todayComps.year && c.month == todayComps.month else { return nil }
-            return o.score
+            return o.displayScore
         }
-        let allTime = outfits.compactMap { $0.score }
+        let allTime = sameEngine.compactMap { $0.displayScore }
         let monthDelta: Double? = (thisMonth.isEmpty || allTime.isEmpty)
             ? nil
             : (thisMonth.reduce(0, +) / Double(thisMonth.count)) - (allTime.reduce(0, +) / Double(allTime.count))

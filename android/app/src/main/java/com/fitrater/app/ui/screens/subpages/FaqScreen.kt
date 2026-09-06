@@ -31,15 +31,15 @@ import com.fitrater.app.ui.theme.HemType
 
 private val FAQS = listOf(
     "What are credits?" to
-        "Credits fuel every scan, generation, try-on, and roast. New accounts start with ${Supa.SIGNUP_CREDITS}. Buy packs anytime or unlock unlimited with Pro.",
+        "Credits fuel every score, Studio generation, try-on, versus, and decode. New accounts start with ${Supa.SIGNUP_CREDITS}. Buy packs anytime or unlock unlimited with Pro.",
     "What happens after my trial?" to
         "Your Pro trial lasts 7 days on the annual plan. Until it ends you get ${Supa.TRIAL_DAILY_CAP} credits/day. After that you're billed and unlock the full monthly cap.",
     "Can I cancel?" to
         "Yes — from Google Play → Payments & subscriptions. Access continues until the current period ends and nothing rolls over. No penalty, no dark patterns.",
     "How is my data used?" to
         "Photos and prompts are processed by our AI providers to score and generate your looks. Nothing is used to train third-party models. Export or delete anytime under Help & privacy.",
-    "What are Hem's honesty modes?" to
-        "Kind reads gentler; Honest is the default; Brutal tells you when a look isn't landing. Pro members get Brutal on every scan.",
+    "How does Hem talk to me?" to
+        "One voice: honest and constructive. Hem tells you what's working, what isn't, and the one change that would lift the look — no flattery, no pile-on.",
     "How does Try-on work?" to
         "Upload a photo of yourself plus a garment (or paste a link) and Hem renders it on you. Costs ${Supa.TRYON_COST} credits per try.",
 )

@@ -23,7 +23,7 @@ struct LatestCard: View {
         VStack(alignment: .leading, spacing: 10) {
             Eyebrow(text: "LATEST")
             heroBox(url: url) {
-                if let s = outfit.score, isScoredKind(outfit.kind), s > 0 {
+                if let s = outfit.displayScore, isScoredKind(outfit.kind), s > 0 {
                     ScoreChip(score: s).padding(14)
                 } else if let k = outfit.kind {
                     OverlayKindPill(label: kindLabel(k)).padding(14)
@@ -146,7 +146,7 @@ func sublineForOutfit(_ o: Outfit, avg: Double?) -> String {
         return "STUDIO"
     default:
         var parts: [String] = []
-        if let a = avg, let s = o.score {
+        if let a = avg, let s = o.displayScore {
             let delta = s - a
             if delta > 0.05 { parts.append(String(format: "%.1f above your average", delta)) }
             else if delta < -0.05 { parts.append(String(format: "%.1f below your average", abs(delta))) }

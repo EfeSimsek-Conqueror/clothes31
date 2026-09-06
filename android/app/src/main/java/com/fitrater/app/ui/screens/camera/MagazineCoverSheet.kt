@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -53,6 +54,8 @@ import com.fitrater.app.data.Supa
 import com.fitrater.app.data.model.ComposeCoverResponse
 import com.fitrater.app.data.model.MagazineCover
 import com.fitrater.app.data.repo.Repo
+import com.fitrater.app.ui.components.ReportContentSheet
+import com.fitrater.app.ui.components.ReportKind
 import com.fitrater.app.ui.theme.Eyebrow
 import com.fitrater.app.ui.theme.HemColors
 import com.fitrater.app.ui.theme.HemSpace
@@ -97,6 +100,7 @@ fun MagazineCoverSheetContent(
     var busy by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
     var cover by remember { mutableStateOf<ComposeCoverResponse?>(null) }
+    var reporting by remember { mutableStateOf(false) }
     var templates by remember { mutableStateOf<List<MagazineCover>>(emptyList()) }
 
     // Edit overrides
@@ -248,7 +252,16 @@ fun MagazineCoverSheetContent(
                         referenceBytes = null; referenceUrl = null
                     },
                     onDone = onClose,
+                    onReport = { reporting = true },
                 )
+                if (reporting) {
+                    ReportContentSheet(
+                        contentKind = ReportKind.COVER,
+                        // Older responses can come back without a cover_id.
+                        contentId = doneCover.cover_id ?: doneCover.cover_url,
+                        onDismiss = { reporting = false },
+                    )
+                }
             } else {
                 Text(
                     "Two photos + a prompt. Tell Hem what to change on the cover.",
@@ -521,18 +534,38 @@ private fun FinishedBlock(
     onNewHeadline: () -> Unit,
     onTryAnother: () -> Unit,
     onDone: () -> Unit,
+    onReport: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        AsyncImage(
-            model = coverUrl,
-            contentDescription = "Composed cover",
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(9f / 16f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(HemColors.CardCream),
-        )
+        Box {
+            AsyncImage(
+                model = coverUrl,
+                contentDescription = "Composed cover",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(9f / 16f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(HemColors.CardCream),
+            )
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(10.dp)
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(HemColors.Paper.copy(alpha = 0.9f))
+                    .clickable(onClick = onReport),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.Flag,
+                    contentDescription = "Report this cover",
+                    tint = HemColors.Ink,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
         cover.headline?.let { Text(it, style = HemType.serifDisplay.copy(fontSize = 20.sp, color = HemColors.Ink)) }
         cover.pull_quote?.let { Text("“$it”", style = HemType.body.copy(fontSize = 14.sp, fontStyle = FontStyle.Italic, color = HemColors.Muted)) }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

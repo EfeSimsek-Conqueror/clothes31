@@ -18,6 +18,7 @@ import com.fitrater.app.data.model.MarkupCoords
 import com.fitrater.app.data.model.TranscribeResponse
 import com.fitrater.app.data.model.ClosetItem
 import com.fitrater.app.data.model.ClosetItemInsert
+import com.fitrater.app.data.model.ContentReportInsert
 import com.fitrater.app.data.model.CreditPack
 import com.fitrater.app.data.model.CreditTransaction
 import com.fitrater.app.data.model.CreditTxInsert
@@ -26,6 +27,7 @@ import com.fitrater.app.data.model.Outfit
 import com.fitrater.app.data.model.OutfitInsert
 import com.fitrater.app.data.model.Profile
 import com.fitrater.app.data.model.ProfileUpsert
+import com.fitrater.app.data.model.displayScore
 import com.fitrater.app.data.model.PushSettings
 import com.fitrater.app.data.model.PushSettingsUpsert
 import com.fitrater.app.data.model.SundayLetter
@@ -107,14 +109,10 @@ object Repo {
         }.getOrDefault(0)
     }
 
-    suspend fun updateHonesty(value: String) {
-        val uid = userId ?: return
-        db["profiles"].update({
-            set("honesty", value)
-        }) {
-            filter { eq("id", uid) }
-        }
-    }
+    // `updateHonesty` lived here for the kind/honest/brutal picker. The picker is
+    // gone and the server coerces every value to "honest", so writing the column
+    // only made the stored preference look load-bearing. The column itself stays
+    // — it is on thousands of production rows.
 
     /** JSON decoder tolerant to legacy rows — used for row-by-row outfit decoding. */
     private val tolerantJson: Json = Json {
@@ -188,11 +186,29 @@ object Repo {
             order("created_at", Order.DESCENDING)
             limit(limit)
         }.data
-        return decodeOutfitsSafe(raw)
+        // Studio outfit side views are siblings of the front — hide them from
+        // the general list so the Journal doesn't show duplicates. They're
+        // fetched explicitly via `linkedOutfit(...)` when opening detail.
+        return decodeOutfitsSafe(raw).filter { it.kind != "outfit_studio_side" }
     }
 
     suspend fun outfitById(id: String): Outfit? {
         val raw = db["outfits"].select { filter { eq("id", id) }; limit(1) }.data
+        return decodeOutfitsSafe(raw).firstOrNull()
+    }
+
+    /**
+     * Find a sibling outfit linked to [linkedTo] (via `linked_piece_id`) with the
+     * given [kind]. Used to fetch the SIDE view for a Studio outfit's front view.
+     */
+    suspend fun linkedOutfit(linkedTo: String, kind: String): Outfit? {
+        val raw = db["outfits"].select {
+            filter {
+                eq("linked_piece_id", linkedTo)
+                eq("kind", kind)
+            }
+            limit(1)
+        }.data
         return decodeOutfitsSafe(raw).firstOrNull()
     }
 
@@ -206,10 +222,24 @@ object Repo {
         return decodeOutfitsSafe(raw).firstOrNull()
     }
 
-    suspend fun averageScore(): Double? {
+    /** Rows written before migration 0007 carry no label; they are all v3. */
+    private fun versionOf(o: Outfit): String = o.scoring_version ?: "v3_mean"
+
+    /**
+     * The user's running average, computed WITHIN one scoring version.
+     *
+     * v4 caps only ever subtract, so mixing the two versions makes a perfectly
+     * good first v4 look read "1.2 below your average" against a history of
+     * uncapped v3 means. [scoringVersion] is normally the version of the row the
+     * delta is being shown against; null means the v3 history.
+     */
+    suspend fun averageScore(scoringVersion: String? = null): Double? {
+        val want = scoringVersion ?: "v3_mean"
         val list = outfits(50)
-        val scored = list.filter { o -> (o.kind == null || o.kind == "score" || o.kind == "user_scan") }
-            .mapNotNull { it.score }
+        val scored = list
+            .filter { o -> (o.kind == null || o.kind == "score" || o.kind == "user_scan") }
+            .filter { o -> versionOf(o) == want }
+            .mapNotNull { it.displayScore }
             .filter { it > 0.0 }
         if (scored.isEmpty()) return null
         return scored.average()
@@ -245,6 +275,20 @@ object Repo {
 
     suspend fun insertClosetItem(item: ClosetItemInsert): ClosetItem {
         return db["closet_items"].insert(item) { select() }.decodeSingle<ClosetItem>()
+    }
+
+    /** File a report against generated content. Throws on failure so the sheet can tell the user. */
+    suspend fun submitContentReport(kind: String, contentId: String, reason: String, note: String? = null) {
+        val uid = userId ?: error("Not signed in")
+        db["content_reports"].insert(
+            ContentReportInsert(
+                user_id = uid,
+                content_kind = kind,
+                content_id = contentId,
+                reason = reason,
+                note = note?.takeIf { it.isNotBlank() },
+            ),
+        )
     }
 
     suspend fun creditPacks(): List<CreditPack> = runCatching {
@@ -356,28 +400,12 @@ object Repo {
         com.fitrater.app.util.CreditsBus.refreshAsync()
     }
 
-    /**
-     * Count of outfits with `kind = 'roast'` created today (device local timezone).
-     * Used to enforce Free-tier's 1 roast/day cap so Brutal-mode stays a Pro teaser.
-     */
-    suspend fun roastsToday(): Int {
-        val uid = userId ?: return 0
-        val startOfToday = java.time.LocalDate.now()
-            .atStartOfDay(java.time.ZoneId.systemDefault())
-            .toOffsetDateTime()
-            .toString()
-        return runCatching {
-            val raw = db["outfits"].select(Columns.list("id,created_at,kind")) {
-                filter {
-                    eq("user_id", uid)
-                    eq("kind", "roast")
-                    gte("created_at", startOfToday)
-                }
-            }.data
-            val arr = kotlinx.serialization.json.Json.parseToJsonElement(raw) as? kotlinx.serialization.json.JsonArray
-            arr?.size ?: 0
-        }.getOrDefault(0)
-    }
+    // `roastsToday()` lived here to enforce the Free-tier 1-roast/day cap that
+    // made "Brutal mode" a Pro teaser. The server has coerced every honesty
+    // value to "honest" for months, the Roast surface is gone, and the counter
+    // had no callers left — removed rather than left as a live-looking gate on a
+    // feature that does nothing. Historical `kind = 'roast'` rows still render in
+    // the Journal; only the sales gate is gone.
 
     /** Sum of credits spent (positive number) today in the device's local timezone. */
     suspend fun creditsSpentToday(): Int {
@@ -562,6 +590,31 @@ object Repo {
         )
         val row = Row(outfit_id = outfitId, resolution = map.resolution, grid = map.grid, hotspots = map.hotspots)
         db["outfit_fit_maps"].upsert(row) { onConflict = "outfit_id" }
+    }
+
+    /**
+     * Persist everything the score response carries that does not live on the
+     * `outfits` row itself: the markup overlay and the fit-tension heatmap.
+     *
+     * Called on the score path right after the insert. Both writes are best
+     * effort — the look is already saved and the number is already on screen, so
+     * a failure here costs an overlay, never the score. Until this existed
+     * `saveAnnotations`/`saveFitMap` were dead code while the detail screen read
+     * `outfit_annotations`, which is why the x-ray never drew on Android.
+     */
+    suspend fun persistScoreExtras(
+        outfitId: String,
+        annotations: List<MarkupAnnotation>,
+        fitMap: FitMap?,
+    ) {
+        if (annotations.isNotEmpty()) {
+            runCatching { saveAnnotations(outfitId, annotations) }
+                .onFailure { android.util.Log.w("Repo", "markup save failed", it) }
+        }
+        if (fitMap?.grid != null) {
+            runCatching { saveFitMap(outfitId, fitMap) }
+                .onFailure { android.util.Log.w("Repo", "fit map save failed", it) }
+        }
     }
 
     /** Load ordered markup annotations for an outfit. */

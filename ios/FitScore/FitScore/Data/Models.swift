@@ -53,6 +53,23 @@ struct Annotation: Codable, Hashable, Sendable {
     var note: String = ""
 }
 
+// The synthesized decoder ignores declaration defaults and throws `keyNotFound`
+// on any missing key — and `annotations` is decoded as an ARRAY, so one row
+// missing one key has always failed the entire response, not just that row.
+// Decode every field with `decodeIfPresent` instead.
+extension Annotation {
+    enum CodingKeys: String, CodingKey { case x_pct, y_pct, label, score, note }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        x_pct = try c.decodeIfPresent(Double.self, forKey: .x_pct) ?? 50.0
+        y_pct = try c.decodeIfPresent(Double.self, forKey: .y_pct) ?? 50.0
+        label = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
+        score = try c.decodeIfPresent(Double.self, forKey: .score) ?? 0.0
+        note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
+    }
+}
+
 /// Markup annotation (Sprint 2) — separate shape from piece-scoring `Annotation`.
 /// Type ∈ {"arrow","line","focus","swap"}. Coords normalized [0,1] with origin top-left.
 ///   - arrow/line: from + to
@@ -114,6 +131,83 @@ struct Outfit: Codable, Hashable, Sendable, Identifiable {
     var created_at: String?
     var kind: String?
     var linked_piece_id: String?
+    // Scoring v4 — all optional; every row written before v4 has none of them.
+    var scoring_version: String?
+    var rubric_id: String?
+    var intake: ScoreIntake?
+    var axes: [Axis]?
+    var score_breakdown: ScoreBreakdown?
+    var dress_code: DressCode?
+    var presence_check: PresenceCheck?
+    var lever: Lever?
+    var caveats: [CaveatRow]?
+    var pieces: [Piece]?
+    var intent: String?
+    var back_photo_path: String?
+    /// Try-on only: the photograph the composite was made from.
+    var before_photo_path: String?
+    var fits_you: Double?
+    var rescore_count: Int?
+    /// Free-form audit blob. Scoring v4 writes the model's raw witness
+    /// statement here; A vs B writes the whole comparison under `versus`.
+    var signals: JSONValue?
+}
+
+/// Score arithmetic shared by every surface that shows a number.
+///
+/// Hem returns an overall `score` alongside the four subscores, but the two
+/// routinely disagree — an overall 7.5 sitting above a BREAKDOWN that averages
+/// 7.0. The headline number now *is* the mean of the reads it is broken down
+/// into, so the detail screen adds up.
+extension Subscores {
+    /// The component reads present on this row, in display order.
+    var values: [Double] { [color, fit, style_match, seasonal].compactMap { $0 } }
+
+    /// Mean of the present component reads, rounded to one decimal. Nil when the
+    /// model returned no components at all.
+    var averaged: Double? {
+        let vs = values
+        guard !vs.isEmpty else { return nil }
+        return ((vs.reduce(0, +) / Double(vs.count)) * 10).rounded() / 10
+    }
+}
+
+extension Outfit {
+    /// Score to display. Falls back to the stored overall score for legacy rows
+    /// that predate subscores.
+    ///
+    /// Legacy only — new surfaces use `displayScore`, which knows about v4.
+    var averagedScore: Double? { subscores?.averaged ?? score }
+
+    /// The number to show for this row, whichever engine wrote it.
+    ///
+    /// For v4, `score` IS the answer: it is the weighted mean over nine axes
+    /// with every cap and floor already applied. The four legacy subscores are a
+    /// projection written for old clients, and re-averaging them here would
+    /// hand back exactly the points the caps took away — a look capped to 6.5
+    /// would display as its uncapped 7.5. For v3 rows the mean is still right,
+    /// because that is literally how those rows were scored.
+    var displayScore: Double? {
+        if scoringFamily == "v4" { return score }
+        return subscores?.averaged ?? score
+    }
+
+    /// "v4" or "v3_mean". Scores may only ever be averaged or compared WITHIN a
+    /// family: v4's caps only ever subtract, so a first v4 score sitting next to
+    /// a pile of v3 means would read "below your average" for a look that is
+    /// fine.
+    var scoringFamily: String {
+        (scoring_version?.hasPrefix("v4") == true) ? "v4" : "v3_mean"
+    }
+
+    /// The brief this look was graded against, for the label under the score.
+    var rubricLabel: String? {
+        guard let intake, scoringFamily == "v4" else { return nil }
+        var parts = [intake.occasion.title, intake.formalityCaption.lowercased()]
+        if let role = intake.role { parts.append(role.rawValue.replacingOccurrences(of: "_", with: " ")) }
+        if let room = intake.room { parts.append(room.rawValue.replacingOccurrences(of: "_", with: " ")) }
+        return parts.filter { !$0.isEmpty }.joined(separator: " · ")
+    }
 }
 
 struct OutfitInsert: Codable, Hashable, Sendable {
@@ -123,12 +217,43 @@ struct OutfitInsert: Codable, Hashable, Sendable {
     var occasion: String
     var hem_comment: String
     var weather_c: Int?
+    /// The two or three sentences under the score. Nil at every call site until
+    /// v4, which is why the verdict slot on the detail screen has been empty
+    /// since launch.
     var verdict: String?
     var subscores: Subscores?
     var swaps: [String]?
     var annotations: [Annotation]?
     var kind: String?
     var linked_piece_id: String?
+    // Scoring v4 — the audit trail. `signals` and `raw_axes` are the model's
+    // untouched witness statement and are what makes a free `/rescore`
+    // possible, so they are written verbatim or not at all.
+    var scoring_version: String?
+    var rubric_id: String?
+    var rubric_version: Int?
+    var intake: ScoreIntake?
+    var axes: [Axis]?
+    var score_breakdown: ScoreBreakdown?
+    var dress_code: DressCode?
+    var presence_check: PresenceCheck?
+    var lever: Lever?
+    var caveats: [CaveatRow]?
+    var pieces: [Piece]?
+    var signals: JSONValue?
+    var raw_axes: JSONValue?
+    var intent: String?
+    var back_photo_path: String?
+    /// Try-on only: the photograph the composite was made from, so the
+    /// before/after survives past the render that produced it.
+    var before_photo_path: String?
+    var fits_you: Double?
+    /// The palette the model read off the photo (`palette_hex`). The journal and
+    /// the style DNA read this column off `Outfit`, and nothing has ever written
+    /// it, which is why both fall back to swatches derived from the image.
+    var dominant_colors: [String]?
+    // `rescore_count` is deliberately absent: the server owns it, and the
+    // column already defaults to 0.
 }
 
 /// Tolerant codable for the outfits.subscores jsonb column. Accepts either:
@@ -307,6 +432,26 @@ struct GenerateResponse: Codable, Hashable, Sendable {
     var image_url: String?
     var seed: Int64?
     var error: String?
+    // Try-on v6 additions. All optional: `generate-piece` shares this type and
+    // never sends them, and a Studio piece skips the read that produces them.
+    /// The flat lay of what the reference actually contained, wearer removed.
+    var plate_url: String?
+    /// "extracted" | "failed" | "not_needed"
+    var plate: String?
+    /// What the reference was read as, one row per garment or accessory.
+    var items: [TryOnItem]?
+}
+
+/// One thing the try-on read out of an uploaded reference.
+struct TryOnItem: Codable, Hashable, Sendable, Identifiable {
+    var slot: String
+    var name: String
+    var id: String { "\(slot)·\(name)" }
+
+    /// "yellow hooded sweatshirt" → "Yellow hooded sweatshirt"
+    var display: String {
+        name.isEmpty ? slot.capitalized : name.prefix(1).uppercased() + name.dropFirst()
+    }
 }
 
 /// One-time body calibration output from the `analyze-body` edge function.

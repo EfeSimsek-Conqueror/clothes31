@@ -19,7 +19,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "FitScore — Your closet, finally honest.",
+  title: "Fitrater — Your closet, finally honest.",
   description:
     "Hem scores your looks, keeps your closet honest, and writes you a letter every Sunday.",
 };

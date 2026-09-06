@@ -77,7 +77,7 @@ private fun AxisRowView(row: AxisRow, onClick: () -> Unit) {
             Text(row.subtitle, style = HemType.bodyMuted.copy(fontSize = 13.sp))
         }
         Text(
-            "3 × 15 CREDITS",
+            "3 × ${com.fitrater.app.data.Supa.SINGLE_PIECE_COST} CREDITS",
             style = HemType.smallLabel.copy(color = HemColors.Bronze, letterSpacing = 1.5.sp),
         )
     }

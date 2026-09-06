@@ -23,12 +23,43 @@ data class CompareResponse(
 
 @Serializable
 data class DecodePiece(
+    /** v2: 2–4 word natural garment name, sentence case. Empty on v1 payloads. */
+    val name: String = "",
+    /** v2: 1–3 word crucial construction detail. Empty on v1 payloads. */
+    val detail: String = "",
     val type: String = "",
     val silhouette: String = "",
     val colors: List<String> = emptyList(),
     val fabric: String = "",
     val note: String = "",
-)
+) {
+    /**
+     * FROZEN render rule (identical on iOS):
+     * name -> "silhouette type" trimmed+capitalised -> type
+     */
+    val displayName: String
+        get() {
+            if (name.isNotBlank()) return name.trim()
+            val composed = "${silhouette.trim()} ${type.trim()}".trim().replaceFirstChar { it.uppercase() }
+            return composed.ifBlank { type.trim().replaceFirstChar { c -> c.uppercase() } }
+        }
+
+    /**
+     * FROZEN render rule (identical on iOS):
+     * [fabric, detail] -> [fabric, colors] -> note
+     */
+    val displayMeta: String
+        get() {
+            val primary = listOf(fabric.trim(), detail.trim()).filter { it.isNotBlank() }.joinToString(" · ")
+            if (primary.isNotBlank()) return primary
+            val joinedColors = colors.map { it.trim() }.filter { it.isNotBlank() }.joinToString(", ")
+            val fallback = listOf(fabric.trim(), joinedColors)
+                .filter { it.isNotBlank() }
+                .joinToString(" · ")
+            if (fallback.isNotBlank()) return fallback
+            return note.trim()
+        }
+}
 
 @Serializable
 data class DecodeResponse(

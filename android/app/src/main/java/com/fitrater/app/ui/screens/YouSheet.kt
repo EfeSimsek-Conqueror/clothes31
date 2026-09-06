@@ -65,6 +65,8 @@ import com.fitrater.app.ui.theme.SerifFamily
 import com.fitrater.app.util.AppScope
 import com.fitrater.app.util.CreditsBus
 import com.fitrater.app.util.ToastBus
+import com.fitrater.app.util.openExternal
+import com.revenuecat.purchases.models.Period
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -76,7 +78,6 @@ private val Red = Color(0xFFB23A2A)
 @Composable
 fun YouSheetContent(
     onOpenCredits: () -> Unit,
-    onOpenPaywall: () -> Unit,
     onOpenStyleProfile: () -> Unit,
     onOpenHelpPrivacy: () -> Unit,
     onOpenWeeklyLetter: () -> Unit,
@@ -87,7 +88,6 @@ fun YouSheetContent(
 ) {
     val context = LocalContext.current
     var profile by remember { mutableStateOf<Profile?>(null) }
-    var honesty by remember { mutableStateOf("honest") }
     var stats by remember { mutableStateOf<Stats?>(null) }
     var latest by remember { mutableStateOf<Outfit?>(null) }
     var avatarUrl by remember { mutableStateOf<String?>(null) }
@@ -99,7 +99,6 @@ fun YouSheetContent(
         CreditsBus.refresh()
         val p = runCatching { Repo.currentProfile() }.getOrNull()
         profile = p
-        p?.honesty?.let { honesty = it }
         avatarUrl = p?.avatar_url
         stats = runCatching { Repo.stats() }.getOrNull()
         latest = runCatching { Repo.outfits(1) }.getOrDefault(emptyList()).firstOrNull()
@@ -240,63 +239,9 @@ fun YouSheetContent(
             }
         }
 
-        Spacer(Modifier.height(HemSpace.lg))
-        // 3. Eyebrow
-        Text(
-            "HOW HONEST SHOULD HEM BE?",
-            style = HemType.smallLabel.copy(color = HemColors.Bronze, letterSpacing = 2.sp),
-        )
-        Spacer(Modifier.height(HemSpace.sm))
-        // 4. Segmented control
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .border(1.dp, HemColors.Hairline, RoundedCornerShape(10.dp)),
-        ) {
-            listOf("kind", "honest", "brutal").forEach { option ->
-                val selected = honesty == option
-                val proLocked = option == "brutal" && !isPro
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .height(44.dp)
-                        .background(if (selected && !proLocked) HemColors.Ink else Color.Transparent)
-                        .clickable {
-                            if (proLocked) {
-                                onOpenPaywall()
-                            } else {
-                                honesty = option
-                                AppScope.launch { runCatching { Repo.updateHonesty(option) } }
-                            }
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        option.uppercase(),
-                        style = HemType.smallLabel.copy(
-                            color = when {
-                                proLocked -> HemColors.Ink.copy(alpha = 0.5f)
-                                selected -> Color.White
-                                else -> HemColors.Ink
-                            },
-                            letterSpacing = 2.sp,
-                        ),
-                    )
-                    if (proLocked) {
-                        Icon(
-                            Icons.Filled.Lock,
-                            contentDescription = "Pro feature",
-                            tint = HemColors.Bronze,
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(4.dp)
-                                .size(12.dp),
-                        )
-                    }
-                }
-            }
-        }
+        // honesty picker removed Aug 2026 — single honest tone. The server now
+        // normalises every tone to "honest", so the kind/honest/brutal segmented
+        // control was promising a choice that no longer exists.
 
         // 5. Quote card
         val quote = latest?.hem_comment
@@ -564,11 +509,12 @@ fun CreditsSheetContent(onClose: () -> Unit, paywallContext: String? = null) {
 
     val balanceBox by CreditsBus.balance.collectAsState()
     val balance = balanceBox ?: 0
-    var packs by remember { mutableStateOf<List<PackRow>>(defaultPackRows()) }
-    var plans by remember { mutableStateOf<List<PlanRow>>(defaultPlanRows()) }
+    var packs by remember { mutableStateOf<List<PackRow>>(emptyList()) }
+    var plans by remember { mutableStateOf<List<PlanRow>>(emptyList()) }
     var isPro by remember { mutableStateOf(false) }
     var loadingOffering by remember { mutableStateOf(true) }
     var processingProductId by remember { mutableStateOf<String?>(null) }
+    var restoring by remember { mutableStateOf(false) }
 
     // Load balance + RC offering once.
     LaunchedEffect(Unit) {
@@ -577,25 +523,23 @@ fun CreditsSheetContent(onClose: () -> Unit, paywallContext: String? = null) {
         val info = runCatching { com.fitrater.app.data.billing.RcBilling.refreshCustomerInfo() }.getOrNull()
         isPro = com.fitrater.app.data.billing.RcBilling.isPro(info)
 
-        if (offering != null) {
-            // Build pack rows: match RC packages by product.id → CreditPackSpec.
-            packs = CREDIT_PACK_SPECS.map { spec ->
-                // Exact-match on product id. Substring match is unsafe here —
-                // "credits_500" is a prefix of "credits_5000", which would let
-                // Popular pick up Mega's price/product.
-                val pkg = offering.availablePackages.firstOrNull { it.product.id == spec.productId }
-                PackRow(
-                    spec = spec,
-                    pkg = pkg,
-                    priceLabel = pkg?.product?.price?.formatted ?: "—",
-                )
-            }
-            plans = listOf(
-                PlanRow("weekly", "Weekly", "cancel anytime", offering.weekly, offering.weekly?.product?.price?.formatted ?: "—"),
-                PlanRow("monthly", "Monthly", "1,200 credits / month", offering.monthly, offering.monthly?.product?.price?.formatted ?: "—"),
-                PlanRow("annual", "Annual", "750 credits / mo · 7-day trial", offering.annual, offering.annual?.product?.price?.formatted ?: "—"),
-            )
+        // Only ever render what the store actually sells right now. A row we can't
+        // price is a row we can't charge for, so showing it just gives the user a
+        // dead card — and the set changes without an app update as products come
+        // and go in Play Console.
+        packs = CREDIT_PACK_SPECS.mapNotNull { spec ->
+            // Exact-match on product id. Substring match is unsafe here —
+            // "credits_500" is a prefix of "credits_5000", which would let
+            // Popular pick up Mega's price/product.
+            val pkg = offering?.availablePackages?.firstOrNull { it.product.id == spec.productId }
+            val price = pkg?.product?.price?.formatted ?: return@mapNotNull null
+            PackRow(spec = spec, pkg = pkg, priceLabel = price)
         }
+        plans = listOfNotNull(
+            planRow("weekly", "Weekly", "cancel anytime", offering?.weekly),
+            planRow("monthly", "Monthly", "1,200 credits / month", offering?.monthly),
+            planRow("annual", "Annual", annualSubline(offering?.annual), offering?.annual),
+        )
         loadingOffering = false
     }
 
@@ -624,13 +568,11 @@ fun CreditsSheetContent(onClose: () -> Unit, paywallContext: String? = null) {
         // Feature-specific hero, when the paywall was opened from a locked feature.
         val heroTitle = when (paywallContext) {
             "tryon" -> "Try-on is Pro."
-            "brutal" -> "Brutal mode is Pro."
             "letter" -> "The Sunday Letter is Pro."
             else -> null
         }
         val heroBody = when (paywallContext) {
             "tryon" -> "Wear any Studio piece on your own photo. Unlimited on Pro."
-            "brutal" -> "Turn Hem's kid gloves off. Brutal, honest, one-line verdicts."
             "letter" -> "A short Sunday letter — what you wore, what worked, what to try."
             else -> null
         }
@@ -730,71 +672,169 @@ fun CreditsSheetContent(onClose: () -> Unit, paywallContext: String? = null) {
                     }
                 },
             )
-            Spacer(Modifier.height(HemSpace.sm))
+            Spacer(Modifier.height(HemSpace.md))
         }
 
-        Spacer(Modifier.height(HemSpace.md))
-        Text(
-            "PRO INSTEAD",
-            style = HemType.smallLabel.copy(color = HemColors.Bronze, letterSpacing = 2.sp),
-        )
-        Spacer(Modifier.height(HemSpace.xs))
-        Text(
-            "Unlimited monthly refills, priority scoring, Sunday letter.",
-            style = HemType.bodyMuted,
-        )
-        Spacer(Modifier.height(HemSpace.md))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(HemSpace.sm)) {
-            plans.forEach { plan ->
-                PlanTile(
-                    plan = plan,
-                    busy = processingProductId == plan.id,
-                    enabled = plan.pkg != null && processingProductId == null,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        val a = activity
-                        val pkg = plan.pkg
-                        if (a == null || pkg == null) return@PlanTile
-                        processingProductId = plan.id
-                        scope.launch {
-                            val result = runCatching { com.fitrater.app.data.billing.RcBilling.purchase(a, pkg) }
-                            processingProductId = null
-                            result
-                                .onSuccess {
-                                    isPro = com.fitrater.app.data.billing.RcBilling.isPro(it.customerInfo)
-                                    runCatching { Repo.markPaywallShown() }
-                                    ToastBus.post("You're Pro — welcome.")
-                                }
-                                .onFailure { err ->
-                                    val msg = err.message ?: ""
-                                    if (msg.contains("cancel", ignoreCase = true)) {
-                                        ToastBus.post("Purchase canceled.")
-                                    } else {
-                                        ToastBus.post("Purchase failed — no charge.")
+        if (plans.isNotEmpty()) {
+            Spacer(Modifier.height(HemSpace.md))
+            Text(
+                "PRO INSTEAD",
+                style = HemType.smallLabel.copy(color = HemColors.Bronze, letterSpacing = 2.sp),
+            )
+            Spacer(Modifier.height(HemSpace.xs))
+            Text(
+                "Unlimited monthly refills, priority scoring, Sunday letter.",
+                style = HemType.bodyMuted,
+            )
+            Spacer(Modifier.height(HemSpace.md))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(HemSpace.md)) {
+                plans.forEach { plan ->
+                    PlanTile(
+                        plan = plan,
+                        busy = processingProductId == plan.id,
+                        enabled = plan.pkg != null && processingProductId == null,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            val a = activity
+                            val pkg = plan.pkg
+                            if (a == null || pkg == null) return@PlanTile
+                            processingProductId = plan.id
+                            scope.launch {
+                                val result = runCatching { com.fitrater.app.data.billing.RcBilling.purchase(a, pkg) }
+                                processingProductId = null
+                                result
+                                    .onSuccess {
+                                        isPro = com.fitrater.app.data.billing.RcBilling.isPro(it.customerInfo)
+                                        runCatching { Repo.markPaywallShown() }
+                                        ToastBus.post("You're Pro — welcome.")
                                     }
-                                }
-                        }
-                    },
-                )
+                                    .onFailure { err ->
+                                        val msg = err.message ?: ""
+                                        if (msg.contains("cancel", ignoreCase = true)) {
+                                            ToastBus.post("Purchase canceled.")
+                                        } else {
+                                            ToastBus.post("Purchase failed — no charge.")
+                                        }
+                                    }
+                            }
+                        },
+                    )
+                }
             }
         }
 
         if (loadingOffering) {
             Spacer(Modifier.height(HemSpace.md))
             Text("Loading store…", style = HemType.bodyMuted.copy(fontSize = 12.sp))
+        } else if (packs.isEmpty() && plans.isEmpty()) {
+            // Nothing purchasable came back — say so rather than leaving a blank sheet.
+            Spacer(Modifier.height(HemSpace.md))
+            Text(
+                "The store isn't reachable right now. Your credits are safe — try again in a moment.",
+                style = HemType.bodyMuted,
+            )
+        }
+
+        Spacer(Modifier.height(HemSpace.lg))
+        Text(
+            if (restoring) "Restoring…" else "Restore purchases",
+            style = HemType.bodyMuted,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = !restoring) {
+                    restoring = true
+                    scope.launch {
+                        val result = com.fitrater.app.data.billing.RcBilling.restore()
+                        restoring = false
+                        when (result) {
+                            is com.fitrater.app.data.billing.RcBilling.RestoreResult.Failed ->
+                                ToastBus.post("Couldn't reach the store — try again in a moment.")
+                            is com.fitrater.app.data.billing.RcBilling.RestoreResult.Success -> {
+                                val pro = result.customerInfo.entitlements
+                                    .get(com.fitrater.app.data.billing.RcBilling.ENTITLEMENT_PRO)
+                                    ?.isActive == true
+                                if (pro) {
+                                    isPro = true
+                                    ToastBus.post("Purchases restored.")
+                                } else {
+                                    ToastBus.post("No purchases found on this account.")
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(vertical = HemSpace.sm),
+        )
+
+        Spacer(Modifier.height(HemSpace.sm))
+        // Play requires the renewal terms and both policy links next to the plans.
+        Text(
+            "Subscription renews automatically. Cancel anytime in Google Play.",
+            style = HemType.bodyMuted.copy(fontSize = 12.sp),
+        )
+        Spacer(Modifier.height(HemSpace.xs))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Terms of Use",
+                style = HemType.bodyMuted.copy(
+                    fontSize = 12.sp,
+                    textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+                ),
+                modifier = Modifier
+                    .clickable { openExternal(context, "https://fitrater.ai/terms") }
+                    .padding(vertical = 4.dp),
+            )
+            Text(
+                "·",
+                style = HemType.bodyMuted.copy(fontSize = 12.sp),
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
+            Text(
+                "Privacy Policy",
+                style = HemType.bodyMuted.copy(
+                    fontSize = 12.sp,
+                    textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+                ),
+                modifier = Modifier
+                    .clickable { openExternal(context, "https://fitrater.ai/privacy") }
+                    .padding(vertical = 4.dp),
+            )
         }
         Spacer(Modifier.height(HemSpace.xl))
     }
 }
 
-private fun defaultPackRows(): List<PackRow> =
-    CREDIT_PACK_SPECS.map { PackRow(it, pkg = null, priceLabel = "—") }
+/** Null when the store has no priced package for this plan, so the caller can drop the tile. */
+private fun planRow(
+    id: String,
+    label: String,
+    subline: String,
+    pkg: com.revenuecat.purchases.Package?,
+): PlanRow? {
+    val price = pkg?.product?.price?.formatted ?: return null
+    return PlanRow(id, label, subline, pkg, price)
+}
 
-private fun defaultPlanRows(): List<PlanRow> = listOf(
-    PlanRow("weekly", "Weekly", "cancel anytime", pkg = null, priceLabel = "—"),
-    PlanRow("monthly", "Monthly", "1,200 credits / month", pkg = null, priceLabel = "—"),
-    PlanRow("annual", "Annual", "750 credits / mo · 7-day trial", pkg = null, priceLabel = "—"),
-)
+/** Only ever promises a trial when the store attached a free phase to the annual offer. */
+private fun annualSubline(pkg: com.revenuecat.purchases.Package?): String {
+    val trial = planTrialLabel(pkg) ?: return "750 credits / mo"
+    return "750 credits / mo · $trial"
+}
+
+private fun planTrialLabel(pkg: com.revenuecat.purchases.Package?): String? = runCatching {
+    val phase = pkg?.product?.defaultOption?.freePhase ?: return@runCatching null
+    val period = phase.billingPeriod
+    val count = period.value
+    if (count <= 0) return@runCatching null
+    val unit = when (period.unit) {
+        Period.Unit.DAY -> "day"
+        Period.Unit.WEEK -> "week"
+        Period.Unit.MONTH -> "month"
+        Period.Unit.YEAR -> "year"
+        else -> return@runCatching null
+    }
+    "$count-$unit trial"
+}.getOrNull()
 
 private fun android.content.Context.findActivity(): android.app.Activity? {
     var ctx: android.content.Context? = this

@@ -11,6 +11,17 @@
         <intent>
             <action android:name="android.media.action.IMAGE_CAPTURE" />
         </intent>
+        <!-- Package visibility for openExternal(): without these, API 30+ hides every browser,
+             CustomTabsClient.getPackageName() returns null and the link falls back to an implicit
+             ACTION_VIEW that our own autoVerify'd fitrater.ai App Links filter swallows. -->
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="http" />
+        </intent>
     </queries>
 
     <application
@@ -27,6 +38,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.FitScoreHem">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -39,6 +51,16 @@
                 <data
                     android:scheme="com.fitrater.app"
                     android:host="auth-callback" />
+            </intent-filter>
+            <!-- Android App Links (https). Verification requires
+                 https://fitrater.ai/.well-known/assetlinks.json to list this
+                 package's Play App Signing SHA-256 fingerprint. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="fitrater.ai" />
+                <data android:scheme="https" android:host="www.fitrater.ai" />
             </intent-filter>
         </activity>
 

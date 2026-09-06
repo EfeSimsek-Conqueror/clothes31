@@ -39,8 +39,8 @@ object Supa {
     const val SCORE_COST: Int = 5
     const val GENERATE_COST: Int = 15
     const val TRYON_COST: Int = 20
+    const val SEASON_SWAP_COST: Int = 10       // re-render the same look in another season
     const val VERSUS_COST: Int = 8
-    const val ROAST_COST: Int = 5
     const val DECODE_COST: Int = 10
     const val OCCASION_COST: Int = 15
     const val BODY_CALIBRATION_COST: Int = 0        // one-time, foundational
@@ -50,6 +50,32 @@ object Supa {
     const val COVER_TEMPLATE_COST: Int = 2          // Fal flux/schnell placeholder + SVG chrome
     const val TAILOR_TICKET_COST: Int = 2           // text-only prompt after heatmap
     const val FRONT_BACK_EXTRA_COST: Int = 2        // added on top of SCORE_COST for dual shot
+
+    // ---- Studio 2.0 pricing (Aug 2026) — sequential outfit wizard ----
+    // SINGLE_PIECE_COST supersedes GENERATE_COST (15) for the Studio single-piece flow.
+    // Outfits are bundle-priced with a Pro gate above 2 pieces.
+    // NOTE: the multi-piece constants below are not wired up yet — Android has no
+    // outfit wizard so far; they exist so the Studio 2.0 port matches iOS 1:1.
+    const val SINGLE_PIECE_COST: Int = 10
+    const val OUTFIT_TWO_COST: Int = 18
+    const val OUTFIT_THREE_COST: Int = 24
+    const val OUTFIT_FOUR_COST: Int = 32
+    const val OUTFIT_EXTRA_PIECE_COST: Int = 8      // per piece beyond 4
+    const val EXTRA_ALTERNATIVES_COST: Int = 5      // "3 new alternatives" reroll
+    const val SINGLE_ALTERNATIVE_REGEN_COST: Int = 2 // per-alternative regen
+    const val STUDIO_COMBINE_STANDALONE_COST: Int = 6 // outfit combine at the end
+
+    /**
+     * Convenience: total credits for an N-piece outfit generation (each piece
+     * yields 3 alternatives). Rejects/regens/combine are billed on top.
+     */
+    fun outfitCost(pieceCount: Int): Int = when {
+        pieceCount <= 1 -> SINGLE_PIECE_COST
+        pieceCount == 2 -> OUTFIT_TWO_COST
+        pieceCount == 3 -> OUTFIT_THREE_COST
+        pieceCount == 4 -> OUTFIT_FOUR_COST
+        else -> OUTFIT_FOUR_COST + (pieceCount - 4) * OUTFIT_EXTRA_PIECE_COST
+    }
 
     // Trial abuse guard: annual sub in its 7-day INTRO period is capped to this many credits/day.
     const val TRIAL_DAILY_CAP: Int = 20
@@ -71,11 +97,18 @@ object Supa {
 
     val client: SupabaseClient by lazy {
         createSupabaseClient(supabaseUrl = URL, supabaseKey = ANON_KEY) {
-            // Ignore unknown DB columns so legacy fields on outfits/etc don't blow up deserialization.
+            // Ignore unknown DB columns so legacy fields on outfits/etc don't blow up
+            // deserialization. `encodeDefaults` is on because the scoring-v4 `intake`
+            // column round-trips a class whose fields carry defaults (so the
+            // `'{}'::jsonb` on every pre-v4 row still decodes) — without it a brief
+            // that happens to match the defaults would be written as an empty object
+            // and the row would lose what it was graded against. `explicitNulls` stays
+            // off, so a null is still omitted rather than written over a column default.
             defaultSerializer = KotlinXSerializer(Json {
                 ignoreUnknownKeys = true
                 explicitNulls = false
                 coerceInputValues = true
+                encodeDefaults = true
             })
             // Fal endpoints (nano-banana image gen, gemini vision scoring) can take 20–40s.
             // Default ktor timeout is 15s → surface as request timeout in the UI. Bump to 120s.

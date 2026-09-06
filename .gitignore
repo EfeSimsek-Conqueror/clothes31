@@ -9,6 +9,9 @@
 **/keystore.properties
 **/*.jks
 **/*.keystore
+# Signing docs — they end up holding the store/key passwords
+**/*KEYSTORE_INFO*.md
+**/*SIGNING*.md
 **/google-services.json
 **/GoogleService-Info.plist
 **/*service*account*.json
@@ -65,3 +68,9 @@ android/store/screenshots/raw/
 __pycache__/
 .claude/
 .vercel
+
+# Editor/tool state, and the Supabase CLI's local scratch.
+.cate/
+supabase/.temp/
+# A loose scratch file at the repo root that holds live credentials.
+/file

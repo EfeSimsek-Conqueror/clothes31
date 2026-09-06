@@ -14,7 +14,7 @@ export default function PrivacyPage() {
     <LegalShell title="Privacy Policy" updated="1 September 2026">
       <LegalSection heading="1. Who we are">
         <p>
-          Fitrater (also branded &ldquo;FitScore / Hem&rdquo;) is operated by{" "}
+          Fitrater (also branded &ldquo;Hem&rdquo;) is operated by{" "}
           {COMPANY}, based in the Netherlands. We are the data controller for
           the personal data described in this policy. You can reach us at{" "}
           <a className="underline" href={`mailto:${CONTACT}`}>{CONTACT}</a>.

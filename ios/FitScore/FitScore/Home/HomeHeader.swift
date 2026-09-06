@@ -6,6 +6,7 @@ struct HomeHeader: View {
     let name: String
     let initial: String
     let credits: Int?
+    var isPro: Bool = false
     var onOpenCredits: () -> Void = {}
 
     var body: some View {
@@ -21,12 +22,21 @@ struct HomeHeader: View {
             }
             Spacer(minLength: 12)
             HStack(alignment: .top, spacing: 6) {
-                VStack(spacing: 4) {
-                    Button(action: {
-                        Haptic.chip()
-                        onOpenCredits()
-                    }) {
-                        CircleToken(text: initial)
+                // Trailing alignment so the credits label stays pinned under the
+                // avatar's right edge rather than re-centring under the wider
+                // badge-plus-avatar row once Pro is on.
+                VStack(alignment: .trailing, spacing: 4) {
+                    HStack(spacing: 8) {
+                        if isPro {
+                            ProBadge(style: .filled)
+                        }
+                        Button(action: {
+                            Haptic.chip()
+                            onOpenCredits()
+                        }) {
+                            CircleToken(text: initial)
+                        }
+                        .accessibilityLabel(isPro ? "Your account, Pro" : "Your account")
                     }
                     Button(action: {
                         Haptic.chip()

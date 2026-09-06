@@ -45,6 +45,7 @@ import com.fitrater.app.ui.theme.HemSpace
 import com.fitrater.app.ui.theme.HemType
 import com.fitrater.app.ui.theme.SerifDisplay
 import com.fitrater.app.util.CreditsBus
+import com.fitrater.app.util.Flags
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 
@@ -52,7 +53,6 @@ import kotlinx.coroutines.launch
 fun YouScreen() {
     val scope = rememberCoroutineScope()
     var profile by remember { mutableStateOf<Profile?>(null) }
-    var honesty by remember { mutableStateOf("honest") }
     var morning by remember { mutableStateOf(true) }
     var weekly by remember { mutableStateOf(true) }
     var wrapped by remember { mutableStateOf(true) }
@@ -64,7 +64,6 @@ fun YouScreen() {
         CreditsBus.refresh()
         val p = runCatching { Repo.currentProfile() }.getOrNull()
         profile = p
-        p?.honesty?.let { honesty = it }
         val push = runCatching { Repo.pushSettings() }.getOrNull()
         push?.morning_stylist?.let { morning = it }
         push?.weekly_task?.let { weekly = it }
@@ -120,83 +119,59 @@ fun YouScreen() {
             }
         }
 
-        Spacer(Modifier.height(HemSpace.lg))
-        Eyebrow("HONESTY")
-        Spacer(Modifier.height(HemSpace.sm))
-        Row(Modifier.fillMaxWidth()) {
-            listOf("kind", "honest", "brutal").forEach { option ->
-                val selected = honesty == option
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .padding(end = 8.dp)
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(if (selected) HemColors.Ink else Color.Transparent)
-                        .border(1.dp, HemColors.Ink.copy(alpha = 0.5f), RoundedCornerShape(999.dp))
-                        .clickable {
-                            honesty = option
-                            scope.launch { runCatching { Repo.updateHonesty(option) } }
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        option.replaceFirstChar { it.uppercase() },
-                        style = HemType.body.copy(
-                            color = if (selected) Color.White else HemColors.Ink,
-                            fontSize = 14.sp,
-                        ),
-                    )
-                }
-            }
-        }
+        // honesty picker removed Aug 2026 — single honest tone. The server normalises
+        // every tone to "honest", so offering kind/honest/brutal was a false choice.
 
-        Spacer(Modifier.height(HemSpace.lg))
-        Eyebrow("NOTIFICATIONS")
-        Spacer(Modifier.height(HemSpace.sm))
-        Hairline()
-        SettingRow(title = "Morning stylist", subtitle = "8:00 AM · your timezone") {
-            Switch(
-                checked = morning,
-                onCheckedChange = {
-                    morning = it
-                    scope.launch { runCatching { Repo.upsertPushSettings(morning, weekly, wrapped) } }
-                },
-                colors = SwitchDefaults.colors(
-                    checkedTrackColor = HemColors.Ink,
-                    checkedThumbColor = Color.White,
-                ),
-            )
+        // Notification preferences are hidden until push actually ships — there is no
+        // FCM registration and no scheduler behind these toggles yet.
+        if (Flags.PUSH_ENABLED) {
+            Spacer(Modifier.height(HemSpace.lg))
+            Eyebrow("NOTIFICATIONS")
+            Spacer(Modifier.height(HemSpace.sm))
+            Hairline()
+            SettingRow(title = "Morning stylist", subtitle = "8:00 AM · your timezone") {
+                Switch(
+                    checked = morning,
+                    onCheckedChange = {
+                        morning = it
+                        scope.launch { runCatching { Repo.upsertPushSettings(morning, weekly, wrapped) } }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedTrackColor = HemColors.Ink,
+                        checkedThumbColor = Color.White,
+                    ),
+                )
+            }
+            Hairline()
+            SettingRow(title = "Weekly task", subtitle = "Sundays — a small challenge") {
+                Switch(
+                    checked = weekly,
+                    onCheckedChange = {
+                        weekly = it
+                        scope.launch { runCatching { Repo.upsertPushSettings(morning, weekly, wrapped) } }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedTrackColor = HemColors.Ink,
+                        checkedThumbColor = Color.White,
+                    ),
+                )
+            }
+            Hairline()
+            SettingRow(title = "Wrapped", subtitle = "End of month recap") {
+                Switch(
+                    checked = wrapped,
+                    onCheckedChange = {
+                        wrapped = it
+                        scope.launch { runCatching { Repo.upsertPushSettings(morning, weekly, wrapped) } }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedTrackColor = HemColors.Ink,
+                        checkedThumbColor = Color.White,
+                    ),
+                )
+            }
+            Hairline()
         }
-        Hairline()
-        SettingRow(title = "Weekly task", subtitle = "Sundays — a small challenge") {
-            Switch(
-                checked = weekly,
-                onCheckedChange = {
-                    weekly = it
-                    scope.launch { runCatching { Repo.upsertPushSettings(morning, weekly, wrapped) } }
-                },
-                colors = SwitchDefaults.colors(
-                    checkedTrackColor = HemColors.Ink,
-                    checkedThumbColor = Color.White,
-                ),
-            )
-        }
-        Hairline()
-        SettingRow(title = "Wrapped", subtitle = "End of month recap") {
-            Switch(
-                checked = wrapped,
-                onCheckedChange = {
-                    wrapped = it
-                    scope.launch { runCatching { Repo.upsertPushSettings(morning, weekly, wrapped) } }
-                },
-                colors = SwitchDefaults.colors(
-                    checkedTrackColor = HemColors.Ink,
-                    checkedThumbColor = Color.White,
-                ),
-            )
-        }
-        Hairline()
 
         Spacer(Modifier.height(HemSpace.lg))
         val tags = profile?.style_tags.orEmpty()

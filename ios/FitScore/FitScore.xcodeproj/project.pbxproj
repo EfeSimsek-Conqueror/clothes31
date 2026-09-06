@@ -24,6 +24,9 @@
 		8D772FE3788951D13A161870 /* ScoreSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F743EBDDA3A5EDED869C70 /* ScoreSheetView.swift */; };
 		A2936FE818C011472D3F5B69 /* TryOnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE5CD51808F92D88F7B0A39 /* TryOnView.swift */; };
 		A0314F4D3B330E82D96A24A6 /* VersusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B121D0DF7AA6F8BC7A1B7713 /* VersusView.swift */; };
+		AB11FF06JUSTSAVED0002 /* JustSavedOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB11FF05JUSTSAVED0001 /* JustSavedOverlay.swift */; };
+		AB11FF04TOOLRESULT002 /* ToolResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB11FF03TOOLRESULT001 /* ToolResultView.swift */; };
+		AB11FF02VERSUSDET0002 /* VersusDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB11FF01VERSUSDET0001 /* VersusDetailView.swift */; };
 		844AF9B630F6ADC04C47C59E /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2305C76C4D3DBB79B6D6B34 /* Models.swift */; };
 		6526605A67D9CBB762DD7FBB /* Repo.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1311A5A79DF23CE924A3277 /* Repo.swift */; };
 		C9D69179329BF78E94221E12 /* SupaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5434FC24B87886F5FA18ADE0 /* SupaClient.swift */; };
@@ -35,7 +38,6 @@
 		E3D7B604ACBF8DA66A9A1C95 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45C0727D204CB7D4C58502C1 /* HomeView.swift */; };
 		1A1C95AED7CAAAB6B5CD0B14 /* LatestCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F35ECDAEFAC68BCBEFEC423B /* LatestCard.swift */; };
 		0901DE53C8E7DD488028B360 /* LowCreditsBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC89035CE9C46A533D799F3 /* LowCreditsBanner.swift */; };
-		65C1CA944E5169AF14AD0114 /* StyleChallengeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E45393380D8946BF6935C47 /* StyleChallengeCard.swift */; };
 		CE0DCE43423EA61EB7A2B7D3 /* SundayLetterPreviewCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68D377BBCF32C4049E39AC76 /* SundayLetterPreviewCard.swift */; };
 		8B99E68CEAF68BDADC52C18D /* WeeklyWrappedCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3B5B0B042D83E0BB33AB6AC /* WeeklyWrappedCard.swift */; };
 		E25B69CF3191E55ACAD764A3 /* JournalExtras.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65B0DE949C785C54CE70A0C3 /* JournalExtras.swift */; };
@@ -47,6 +49,11 @@
 		633813889E8BDEA3AEF43949 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A65C882BE553E9D72C8E084 /* PaywallView.swift */; };
 		A757EC471EEC97DFD31E13BE /* ScoreDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3556473A0633DAB247FB981 /* ScoreDetailView.swift */; };
 		B1CA300000000000000C000B /* ScoreAnnotationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1CA300000000000000C000C /* ScoreAnnotationView.swift */; };
+		B1CA300000000000000D0005 /* RubricWeights.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1CA300000000000000D0006 /* RubricWeights.swift */; };
+		B1CA300000000000000D0003 /* RubricTables.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1CA300000000000000D0004 /* RubricTables.swift */; };
+		B1CA300000000000000D0009 /* ScoreRevealOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1CA300000000000000D000A /* ScoreRevealOverlay.swift */; };
+		B1CA300000000000000D0007 /* AxisBreakdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1CA300000000000000D0008 /* AxisBreakdownView.swift */; };
+		B1CA300000000000000D0001 /* ScoreV4.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1CA300000000000000D0002 /* ScoreV4.swift */; };
 		2A2A10A712B13E206A191097 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B3DB6BC6DC79FCA8BE590A7 /* SignInView.swift */; };
 		53192E20CACD4BC667E4B93E /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70BCB1B65FE93D62F39FE6CE /* SplashView.swift */; };
 		12083105D8200DBD14BEB72C /* PieceDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE82AD908173A5283B5603B2 /* PieceDetailSheet.swift */; };
@@ -122,7 +129,6 @@
 		45C0727D204CB7D4C58502C1 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		F35ECDAEFAC68BCBEFEC423B /* LatestCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LatestCard.swift; sourceTree = "<group>"; };
 		FAC89035CE9C46A533D799F3 /* LowCreditsBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LowCreditsBanner.swift; sourceTree = "<group>"; };
-		9E45393380D8946BF6935C47 /* StyleChallengeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StyleChallengeCard.swift; sourceTree = "<group>"; };
 		68D377BBCF32C4049E39AC76 /* SundayLetterPreviewCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SundayLetterPreviewCard.swift; sourceTree = "<group>"; };
 		E3B5B0B042D83E0BB33AB6AC /* WeeklyWrappedCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyWrappedCard.swift; sourceTree = "<group>"; };
 		65B0DE949C785C54CE70A0C3 /* JournalExtras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalExtras.swift; sourceTree = "<group>"; };
@@ -133,7 +139,15 @@
 		B1CA100000000000000C0004 /* BodyProfileRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyProfileRevealView.swift; sourceTree = "<group>"; };
 		6A65C882BE553E9D72C8E084 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		B3556473A0633DAB247FB981 /* ScoreDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreDetailView.swift; sourceTree = "<group>"; };
+		AB11FF05JUSTSAVED0001 /* JustSavedOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JustSavedOverlay.swift; sourceTree = "<group>"; };
+		AB11FF03TOOLRESULT001 /* ToolResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolResultView.swift; sourceTree = "<group>"; };
+		AB11FF01VERSUSDET0001 /* VersusDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersusDetailView.swift; sourceTree = "<group>"; };
 		B1CA300000000000000C000C /* ScoreAnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreAnnotationView.swift; sourceTree = "<group>"; };
+		B1CA300000000000000D0006 /* RubricWeights.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RubricWeights.swift; sourceTree = "<group>"; };
+		B1CA300000000000000D0004 /* RubricTables.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RubricTables.swift; sourceTree = "<group>"; };
+		B1CA300000000000000D000A /* ScoreRevealOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreRevealOverlay.swift; sourceTree = "<group>"; };
+		B1CA300000000000000D0008 /* AxisBreakdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBreakdownView.swift; sourceTree = "<group>"; };
+		B1CA300000000000000D0002 /* ScoreV4.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreV4.swift; sourceTree = "<group>"; };
 		8B3DB6BC6DC79FCA8BE590A7 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		70BCB1B65FE93D62F39FE6CE /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
 		EE82AD908173A5283B5603B2 /* PieceDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PieceDetailSheet.swift; sourceTree = "<group>"; };
@@ -311,7 +325,6 @@
 				45C0727D204CB7D4C58502C1 /* HomeView.swift */,
 				F35ECDAEFAC68BCBEFEC423B /* LatestCard.swift */,
 				FAC89035CE9C46A533D799F3 /* LowCreditsBanner.swift */,
-				9E45393380D8946BF6935C47 /* StyleChallengeCard.swift */,
 				68D377BBCF32C4049E39AC76 /* SundayLetterPreviewCard.swift */,
 				E3B5B0B042D83E0BB33AB6AC /* WeeklyWrappedCard.swift */,
 			);
@@ -342,7 +355,15 @@
 			isa = PBXGroup;
 			children = (
 				B3556473A0633DAB247FB981 /* ScoreDetailView.swift */,
+				AB11FF05JUSTSAVED0001 /* JustSavedOverlay.swift */,
+				AB11FF03TOOLRESULT001 /* ToolResultView.swift */,
+				AB11FF01VERSUSDET0001 /* VersusDetailView.swift */,
 				B1CA300000000000000C000C /* ScoreAnnotationView.swift */,
+				B1CA300000000000000D0006 /* RubricWeights.swift */,
+				B1CA300000000000000D0004 /* RubricTables.swift */,
+				B1CA300000000000000D000A /* ScoreRevealOverlay.swift */,
+				B1CA300000000000000D0008 /* AxisBreakdownView.swift */,
+				B1CA300000000000000D0002 /* ScoreV4.swift */,
 			);
 			path = Score;
 			sourceTree = "<group>";
@@ -544,6 +565,9 @@
 				8D772FE3788951D13A161870 /* ScoreSheetView.swift in Sources */,
 				A2936FE818C011472D3F5B69 /* TryOnView.swift in Sources */,
 				A0314F4D3B330E82D96A24A6 /* VersusView.swift in Sources */,
+				AB11FF06JUSTSAVED0002 /* JustSavedOverlay.swift in Sources */,
+				AB11FF04TOOLRESULT002 /* ToolResultView.swift in Sources */,
+				AB11FF02VERSUSDET0002 /* VersusDetailView.swift in Sources */,
 				844AF9B630F6ADC04C47C59E /* Models.swift in Sources */,
 				6526605A67D9CBB762DD7FBB /* Repo.swift in Sources */,
 				C9D69179329BF78E94221E12 /* SupaClient.swift in Sources */,
@@ -555,7 +579,6 @@
 				E3D7B604ACBF8DA66A9A1C95 /* HomeView.swift in Sources */,
 				1A1C95AED7CAAAB6B5CD0B14 /* LatestCard.swift in Sources */,
 				0901DE53C8E7DD488028B360 /* LowCreditsBanner.swift in Sources */,
-				65C1CA944E5169AF14AD0114 /* StyleChallengeCard.swift in Sources */,
 				CE0DCE43423EA61EB7A2B7D3 /* SundayLetterPreviewCard.swift in Sources */,
 				8B99E68CEAF68BDADC52C18D /* WeeklyWrappedCard.swift in Sources */,
 				E25B69CF3191E55ACAD764A3 /* JournalExtras.swift in Sources */,
@@ -567,6 +590,11 @@
 				633813889E8BDEA3AEF43949 /* PaywallView.swift in Sources */,
 				A757EC471EEC97DFD31E13BE /* ScoreDetailView.swift in Sources */,
 				B1CA300000000000000C000B /* ScoreAnnotationView.swift in Sources */,
+				B1CA300000000000000D0005 /* RubricWeights.swift in Sources */,
+				B1CA300000000000000D0003 /* RubricTables.swift in Sources */,
+				B1CA300000000000000D0009 /* ScoreRevealOverlay.swift in Sources */,
+				B1CA300000000000000D0007 /* AxisBreakdownView.swift in Sources */,
+				B1CA300000000000000D0001 /* ScoreV4.swift in Sources */,
 				2A2A10A712B13E206A191097 /* SignInView.swift in Sources */,
 				53192E20CACD4BC667E4B93E /* SplashView.swift in Sources */,
 				12083105D8200DBD14BEB72C /* PieceDetailSheet.swift in Sources */,
@@ -663,7 +691,7 @@
 				CODE_SIGN_ENTITLEMENTS = FitScore/Fitrater.entitlements;
 				DEVELOPMENT_TEAM = NCYFB69WBK;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 17;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = FitScore/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -672,7 +700,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = ( "$(inherited)", "@executable_path/Frameworks", );
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fitrater.app;
 				PRODUCT_NAME = Fitrater;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -692,7 +720,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_ENTITLEMENTS = FitScore/Fitrater.entitlements;
 				DEVELOPMENT_TEAM = NCYFB69WBK;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 17;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = FitScore/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -701,7 +729,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = ( "$(inherited)", "@executable_path/Frameworks", );
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fitrater.app;
 				PRODUCT_NAME = Fitrater;
 				SWIFT_EMIT_LOC_STRINGS = YES;

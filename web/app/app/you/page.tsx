@@ -35,7 +35,7 @@ export default function YouPage() {
         <Eyebrow>Settings</Eyebrow>
         <ul className="mt-2">
           {[
-            { title: "Subscription", subtitle: "FitScore Pro · Annual" },
+            { title: "Subscription", subtitle: "Fitrater Pro · Annual" },
             { title: "Notifications", subtitle: "Weekly Sunday letter" },
             { title: "Privacy", subtitle: "Photos stay on your device" },
             { title: "Sign out", subtitle: "" },

@@ -63,6 +63,7 @@ fun StudioScreen(
     onCreateNew: () -> Unit,
     onOpenEdit: (item: ClosetItem, referenceUrl: String?) -> Unit = { _, _ -> },
     onCreateCoverTemplate: () -> Unit = {},
+    onCreateOutfit: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -73,6 +74,10 @@ fun StudioScreen(
     var loaded by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // Studio 2.0: "Create New" no longer jumps straight into the single-piece
+    // flow — it opens the mode gateway (single piece vs full outfit), mirroring
+    // iOS `StudioCreateGateway`.
+    var showGateway by remember { mutableStateOf(false) }
 
     suspend fun refresh() {
         val list = runCatching { Repo.closetItems() }.getOrDefault(emptyList())
@@ -189,9 +194,9 @@ fun StudioScreen(
                 StudioEmptyCard(
                     glyph = "✦",
                     title = "Create new",
-                    subtitle = "Design with a template",
+                    subtitle = "One piece or a full outfit",
                     modifier = Modifier.weight(1f),
-                    onClick = onCreateNew,
+                    onClick = { showGateway = true },
                 )
             }
         } else {
@@ -227,9 +232,9 @@ fun StudioScreen(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(HemSpace.sm)) {
                 StudioActionCard(
                     title = "+ Create New",
-                    subtitle = "Guided AI design",
+                    subtitle = "One piece or a full outfit",
                     modifier = Modifier.weight(1f),
-                    onClick = onCreateNew,
+                    onClick = { showGateway = true },
                 )
                 StudioActionCard(
                     title = if (busy) "Uploading…" else "↑ Import",
@@ -255,6 +260,14 @@ fun StudioScreen(
         Spacer(Modifier.height(HemSpace.xl))
     }
 
+    if (showGateway) {
+        StudioModeGatewaySheet(
+            onDismiss = { showGateway = false },
+            onSinglePiece = { showGateway = false; onCreateNew() },
+            onFullOutfit = { showGateway = false; onCreateOutfit() },
+        )
+    }
+
     val sel = selected
     if (sel != null) {
         PieceDetailSheet(
@@ -267,6 +280,145 @@ fun StudioScreen(
                 onOpenEdit(sel, url)
             },
         )
+    }
+}
+
+/**
+ * Studio 2.0 mode gateway — port of iOS `StudioCreateGateway`. Kept as a bottom
+ * sheet rather than a route: "Create New" already lives inside the Studio tab,
+ * and a sheet avoids an extra back-stack hop before the real flow starts. The
+ * outfit wizard itself IS a route (it hosts the full StudioCreateScreen).
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun StudioModeGatewaySheet(
+    onDismiss: () -> Unit,
+    onSinglePiece: () -> Unit,
+    onFullOutfit: () -> Unit,
+) {
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = HemColors.Paper,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = HemSpace.gutter)
+                .padding(bottom = HemSpace.xl),
+        ) {
+            com.fitrater.app.ui.theme.Eyebrow("STUDIO")
+            Spacer(Modifier.height(HemSpace.sm))
+            SerifDisplay("Compose a new look.")
+            Spacer(Modifier.height(HemSpace.xs))
+            Text(
+                "Start with a single piece or build a full outfit one item at a time.",
+                style = HemType.bodyMuted,
+            )
+            Spacer(Modifier.height(HemSpace.lg))
+
+            GatewayModeCard(
+                eyebrow = "MODE · 01",
+                title = "Single Piece",
+                body = "One garment, three variations. Pick your favourite — the rest go to your Journal drafts.",
+                price = Supa.SINGLE_PIECE_COST,
+                accent = false,
+                badge = null,
+                onClick = onSinglePiece,
+            )
+            Spacer(Modifier.height(HemSpace.md))
+            GatewayModeCard(
+                eyebrow = "MODE · 02",
+                title = "Full Outfit",
+                body = "Build a look piece by piece. Choose the parts, pick a style, and Hem stitches them together on one model.",
+                price = Supa.outfitCost(3),
+                accent = true,
+                badge = "NEW",
+                onClick = onFullOutfit,
+            )
+            Spacer(Modifier.height(HemSpace.lg))
+            Text(
+                "Free plan · up to 2 pieces per outfit. Go Pro for 3 or more.",
+                style = HemType.bodyMuted.copy(fontSize = 12.sp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun GatewayModeCard(
+    eyebrow: String,
+    title: String,
+    body: String,
+    price: Int,
+    accent: Boolean,
+    badge: String?,
+    onClick: () -> Unit,
+) {
+    val fg = if (accent) Color.White else HemColors.Ink
+    val subFg = if (accent) Color.White.copy(alpha = 0.82f) else HemColors.Muted
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (accent) HemColors.Ink else HemColors.CardCream)
+            .border(
+                1.dp,
+                if (accent) Color.Transparent else HemColors.Hairline,
+                RoundedCornerShape(16.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(HemSpace.lg),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                eyebrow,
+                style = HemType.smallLabel.copy(
+                    color = if (accent) Color.White.copy(alpha = 0.72f) else HemColors.Bronze,
+                    letterSpacing = 2.sp,
+                ),
+                modifier = Modifier.weight(1f),
+            )
+            if (badge != null) {
+                Text(
+                    badge,
+                    style = HemType.smallLabel.copy(color = if (accent) HemColors.Ink else Color.White),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(if (accent) Color.White else HemColors.Bronze)
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(HemSpace.sm))
+        Text(title, style = HemType.serifTitle.copy(color = fg))
+        Spacer(Modifier.height(HemSpace.xs))
+        Text(body, style = HemType.bodyMuted.copy(color = subFg))
+        Spacer(Modifier.height(HemSpace.md))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(if (accent) Color.White.copy(alpha = 0.25f) else HemColors.Hairline),
+        )
+        Spacer(Modifier.height(HemSpace.sm))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("FROM", style = HemType.smallLabel.copy(color = subFg, fontSize = 11.sp))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "✦ $price",
+                style = HemType.body.copy(color = fg, fontWeight = FontWeight.SemiBold, fontSize = 20.sp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text("credits", style = HemType.bodyMuted.copy(color = subFg, fontSize = 13.sp))
+            Spacer(Modifier.weight(1f))
+            Text(
+                "BEGIN →",
+                style = HemType.smallLabel.copy(color = if (accent) Color.White else HemColors.Bronze, fontSize = 12.sp),
+            )
+        }
     }
 }
 

@@ -1,6 +1,6 @@
-# FitScore — Web
+# Fitrater — Web
 
-The web client of **FitScore / Hem** — a cream editorial magazine take on an
+The web client of **Fitrater / Hem** — a cream editorial magazine take on an
 honest closet.
 
 ## Stack
@@ -47,7 +47,7 @@ Management API.
 - `/` — Landing (editorial hero, sections, footer)
 - `/signin` — Sign in (Google + email OTP via Supabase)
 - `/onboarding` — Two-step gender + vibe onboarding
-- `/paywall` — FitScore Pro paywall
+- `/paywall` — Fitrater Pro paywall
 - `/app` — Today (bottom-tab shell)
 - `/app/studio` — Studio (closet pieces, credits)
 - `/app/journal` — Journal (Sunday letter + list)

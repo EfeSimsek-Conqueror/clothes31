@@ -8,6 +8,9 @@ import Kingfisher
 struct JournalView: View {
     @State private var outfits: [Outfit] = []
     @State private var photoUrls: [String: String] = [:]
+    /// Comparisons have a second frame; `photoUrls` only ever holds the row's
+    /// own `photo_path` (the winner).
+    @State private var versusUrls: [String: String] = [:]
     @State private var loaded = false
 
     @State private var kindTab: KindTab = .all
@@ -22,8 +25,11 @@ struct JournalView: View {
     private enum KindTab: String, CaseIterable { case all = "All", fits = "Fits", studio = "Studio" }
     private enum FilterKind: String, CaseIterable { case all, best }
 
-    private static let FIT_KINDS: Set<String> = ["score", "user_scan"]
+    private static let FIT_KINDS: Set<String> = ["score", "user_scan", "versus"]
     private static let STUDIO_KINDS: Set<String> = ["studio_gen", "tryon", "roast", "decode", "occasion_plan"]
+    /// Kinds that earn a badge on the card. A vs B is a scored fit, so it lives
+    /// under Fits — but it still needs to say where the score came from.
+    private static let PILL_KINDS: Set<String> = STUDIO_KINDS.union(["versus"])
     private static let DEFAULT_OCCASIONS = ["Everyday", "Work", "Date", "Wedding", "Weekend", "Party", "Formal", "Travel"]
 
     var body: some View {
@@ -281,6 +287,8 @@ struct JournalView: View {
     private func heroCard(_ o: Outfit) -> some View {
         if o.kind == "occasion_plan" {
             occasionPlanCard(o)
+        } else if let v = o.versusSummary {
+            versusCard(o, v)
         } else {
             let url = o.id.flatMap { photoUrls[$0] }
             Button {
@@ -308,16 +316,106 @@ struct JournalView: View {
                     .aspectRatio(3.0/4.0, contentMode: .fit)
                     .frame(maxWidth: .infinity)
                     .clipped()
-                    if let sc = o.score, sc > 0 {
+                    if let k = o.kind, Self.PILL_KINDS.contains(k) {
+                        // Tool output: name the tool. A score, if there is one,
+                        // rides underneath rather than posing as the headline.
+                        VStack(alignment: .trailing, spacing: 6) {
+                            kindPill(k)
+                            if let sc = o.score, sc > 0 { scoreChip(sc).scaleEffect(0.85) }
+                        }
+                        .padding(12)
+                    } else if let sc = o.score, sc > 0 {
                         scoreChip(sc).padding(12)
-                    } else if let k = o.kind, Self.STUDIO_KINDS.contains(k) {
-                        kindPill(k).padding(12)
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 4))
                 .shadow(color: Palette.ink.opacity(0.08), radius: 12, x: 0, y: 6)
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    /// A comparison shown as one scored photo would misreport what happened.
+    /// The card carries both frames, both totals and the call.
+    private func versusCard(_ o: Outfit, _ v: VersusSummary) -> some View {
+        let winnerUrl = o.id.flatMap { photoUrls[$0] }
+        let otherUrl = o.id.flatMap { versusUrls[$0] }
+        let aUrl = v.winner == "B" ? otherUrl : winnerUrl
+        let bUrl = v.winner == "B" ? winnerUrl : otherUrl
+        return Button {
+            guard let id = o.id else { return }
+            Haptic.tap()
+            openOutfitId = id
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("A VS B")
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(2)
+                        .foregroundStyle(Palette.bronze)
+                    Spacer()
+                    Text(v.judgedFor.uppercased())
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1.5)
+                        .foregroundStyle(Palette.muted)
+                        .lineLimit(1)
+                }
+                HStack(spacing: 8) {
+                    versusFrame(aUrl, "A", v.totalA, v.winner == "A")
+                    versusFrame(bUrl, "B", v.totalB, v.winner == "B")
+                }
+                if let call = o.hem_comment, !call.isEmpty {
+                    Text(call)
+                        .font(Serif.body(14))
+                        .foregroundStyle(Palette.ink)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Palette.card)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func versusFrame(_ url: String?, _ letter: String, _ score: Int, _ isWinner: Bool) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            Color.clear
+                .aspectRatio(0.78, contentMode: .fit)
+                .overlay(Palette.paper)
+                .overlay(
+                    Group {
+                        if let s = url, let u = URL(string: s) {
+                            KFImage(u)
+                                .placeholder { Rectangle().fill(Palette.muted.opacity(0.15)) }
+                                .resizable()
+                                .scaledToFill()
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                )
+                .overlay(LinearGradient(colors: [.clear, .black.opacity(0.5)], startPoint: .center, endPoint: .bottom))
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(isWinner ? Palette.bronze : Palette.hairline, lineWidth: isWinner ? 2 : 1)
+                )
+            HStack(alignment: .bottom) {
+                Text(isWinner ? "WINNER" : letter)
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(1.5)
+                    .foregroundStyle(.white)
+                Spacer(minLength: 4)
+                Text("\(score)")
+                    .font(Serif.display(20))
+                    .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 6)
         }
     }
 
@@ -383,10 +481,29 @@ struct JournalView: View {
                 }
                 .frame(width: 128, height: 168)
                 .clipped()
-                if let sc = o.score, sc > 0 {
+                if let k = o.kind, Self.PILL_KINDS.contains(k), o.versusSummary == nil {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        kindPill(k).scaleEffect(0.85)
+                        if let sc = o.score, sc > 0 { scoreChip(sc).scaleEffect(0.8) }
+                    }
+                    .padding(6)
+                } else if let v = o.versusSummary {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("\(v.winnerScore)")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(Palette.bronze).clipShape(Capsule())
+                        Text("A VS B")
+                            .font(.system(size: 8, weight: .semibold))
+                            .tracking(1.2)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6).padding(.vertical, 3)
+                            .background(Palette.ink.opacity(0.75)).clipShape(Capsule())
+                    }
+                    .padding(6)
+                } else if let sc = o.score, sc > 0 {
                     scoreChip(sc).padding(6).scaleEffect(0.9)
-                } else if let k = o.kind, Self.STUDIO_KINDS.contains(k) {
-                    kindPill(k).padding(6).scaleEffect(0.85)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -641,13 +758,21 @@ struct JournalView: View {
         do {
             let list = try await Repo.shared.outfits(limit: 200)
             var urls: [String: String] = [:]
+            var pairs: [String: String] = [:]
             for o in list {
                 if let id = o.id, let p = o.photo_path {
                     urls[id] = (try? await Repo.shared.signedOutfitUrl(p)) ?? nil
                 }
+                // For a comparison, sign whichever frame is NOT the winner so the
+                // card can show the pair it was actually judged on.
+                if let id = o.id, let v = o.versusSummary {
+                    let other = v.winner == "B" ? v.aPath : v.bPath
+                    pairs[id] = (try? await Repo.shared.signedOutfitUrl(other)) ?? nil
+                }
             }
             self.outfits = list
             self.photoUrls = urls
+            self.versusUrls = pairs
         } catch {
             self.outfits = []
         }

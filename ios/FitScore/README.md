@@ -1,4 +1,4 @@
-# FitScore / Hem — iOS
+# Fitrater / Hem — iOS
 
 SwiftUI, iOS 17+. The Xcode project builds without any SPM dependencies so it runs immediately.
 
@@ -17,7 +17,7 @@ open FitScore.xcodeproj
 Or from the command line, target a simulator:
 
 ```bash
-xcodebuild -project FitScore.xcodeproj -scheme FitScore \
+xcodebuild -project FitScore.xcodeproj -scheme Fitrater \
   -destination 'generic/platform=iOS Simulator' \
   -configuration Debug build
 ```
@@ -25,13 +25,13 @@ xcodebuild -project FitScore.xcodeproj -scheme FitScore \
 To run:
 
 ```bash
-xcodebuild -project FitScore.xcodeproj -scheme FitScore \
+xcodebuild -project FitScore.xcodeproj -scheme Fitrater \
   -destination 'platform=iOS Simulator,name=iPhone 15' build
 ```
 
 ## Supabase
 
-The app is wired to the FitScore Supabase project:
+The app is wired to the Fitrater Supabase project:
 
 - URL: `https://ilrzqifdmjvooeyqvexd.supabase.co`
 - Publishable key (client-safe) is embedded in `SupabaseClient.swift`.

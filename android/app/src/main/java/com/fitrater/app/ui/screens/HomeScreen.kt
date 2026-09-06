@@ -45,6 +45,7 @@ import coil.request.ImageRequest
 import coil.size.Size
 import com.fitrater.app.data.model.ClosetItem
 import com.fitrater.app.data.model.Outfit
+import com.fitrater.app.data.model.displayScore
 import com.fitrater.app.data.model.SundayLetter
 import com.fitrater.app.data.repo.LatestActivity
 import com.fitrater.app.data.repo.Repo
@@ -78,6 +79,7 @@ fun HomeScreen(
     onOpenJournal: () -> Unit = {},
     onOpenStudio: () -> Unit = {},
     onOpenCamera: () -> Unit = {},
+    onOpenChat: () -> Unit = {},
     onOpenCredits: () -> Unit = {},
     onOpenPaywall: () -> Unit = {},
     isPro: Boolean = false,
@@ -107,7 +109,12 @@ fun HomeScreen(
         latestAct = runCatching { Repo.latestActivity() }
             .onFailure { com.fitrater.app.util.ToastBus.post("Couldn't load latest") }
             .getOrNull()
-        averageScore = runCatching { Repo.averageScore() }.getOrNull()
+        // The average has to be taken within the scoring version of the row it
+        // is compared against — v4 caps only subtract, so a v4 look measured
+        // against a v3 history reads "below your average" for no reason.
+        averageScore = runCatching {
+            Repo.averageScore((latestAct as? LatestActivity.OutfitItem)?.outfit?.scoring_version)
+        }.getOrNull()
         bestOutfit = runCatching { Repo.bestOutfit() }.getOrNull()
         hemNoteBody = runCatching { Repo.latestHemNote()?.body }.getOrNull()
         tempC = runCatching { Weather.temperatureCelsius(context) }.getOrNull()
@@ -165,6 +172,11 @@ fun HomeScreen(
 
         if (!hemNoteBody.isNullOrBlank() && !isFirstRun) {
             HemMorningCard(hemNoteBody!!)
+            Spacer(Modifier.height(HemSpace.lg))
+        }
+
+        if (!isFirstRun) {
+            StylistInviteBar(onTap = onOpenChat)
             Spacer(Modifier.height(HemSpace.lg))
         }
 
@@ -299,13 +311,6 @@ fun HomeScreen(
         PrimaryButton(label = "✦ Score a look", onClick = onScoreALook)
         Spacer(Modifier.height(HemSpace.lg))
 
-        // Style challenge of the week
-        StyleChallengeCard(
-            title = StyleChallenges.current(),
-            onSeeProgress = onOpenJournal,
-        )
-        Spacer(Modifier.height(HemSpace.md))
-
         // Sunday letter preview
         SundayLetterPreview(
             letter = sundayLetter,
@@ -408,7 +413,8 @@ private fun sublineForOutfit(outfit: Outfit, avg: Double?): String {
         "decode" -> "DECODED"
         "studio_gen" -> "STUDIO"
         else -> {
-            val delta = if (avg != null && outfit.score != null) outfit.score - avg else null
+            val score = outfit.displayScore
+            val delta = if (avg != null && score != null) score - avg else null
             val deltaText = when {
                 delta == null -> null
                 delta > 0 -> String.format(Locale.US, "%.1f above your average", delta)
@@ -523,6 +529,35 @@ private fun HomeHeader(
     }
 }
 
+/** Compact entry point into the stylist chat — mirrors iOS's StylistHomeInviteBar. */
+@Composable
+private fun StylistInviteBar(onTap: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(HemColors.CardCream)
+            .border(1.dp, HemColors.Hairline, RoundedCornerShape(14.dp))
+            .clickable(onClick = onTap)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "Ask your stylist…",
+            style = HemType.bodyMuted.copy(fontSize = 14.sp),
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            "→",
+            style = HemType.body.copy(
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = HemColors.Bronze,
+            ),
+        )
+    }
+}
+
 @Composable
 private fun HemMorningCard(body: String) {
     Column {
@@ -547,35 +582,6 @@ private fun EmptyLatestOutfit(onScoreALook: () -> Unit) {
         Spacer(Modifier.height(HemSpace.xs))
         Text(
             "Tap the camera below and let Hem take the first read.",
-            style = HemType.bodyMuted,
-        )
-    }
-}
-
-@Composable
-private fun StyleChallengeCard(title: String, onSeeProgress: () -> Unit) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(HemColors.CardCream)
-            .border(1.dp, HemColors.Hairline, RoundedCornerShape(14.dp))
-            .padding(HemSpace.md),
-    ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Eyebrow("THIS WEEK'S CHALLENGE")
-            Spacer(Modifier.weight(1f))
-            Text(
-                "SEE PROGRESS →",
-                style = HemType.eyebrow,
-                modifier = Modifier.clickable { onSeeProgress() },
-            )
-        }
-        Spacer(Modifier.height(HemSpace.sm))
-        Text(title, style = HemType.serifSection)
-        Spacer(Modifier.height(HemSpace.xs))
-        Text(
-            "Score a fit that matches — Hem will note it in your Journal.",
             style = HemType.bodyMuted,
         )
     }

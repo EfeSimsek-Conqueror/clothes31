@@ -2,11 +2,15 @@ import SwiftUI
 
 /// Top-of-funnel home feed. Loads profile, latest activity, hem note,
 /// recent outfits, sunday letter, and closet count in parallel — then composes
-/// the header + banners + LATEST card + Style challenge + Sunday letter +
+/// the header + banners + LATEST card + Sunday letter +
 /// recents strip + best/journal 2-up row. Ports Android `HomeScreen`.
 struct HomeView: View {
     @EnvironmentObject var session: SessionStore
     @ObservedObject private var credits = CreditsBus.shared
+    // Observed, not just read: the RevenueCat entitlement usually lands after the
+    // first render, and an unobserved read would leave the Pro badge missing
+    // until something else happened to redraw the header.
+    @ObservedObject private var billing = RcBilling.shared
 
     @State private var latestAct: LatestActivity?
     @State private var averageScore: Double?
@@ -21,6 +25,8 @@ struct HomeView: View {
     @State private var firstRunDone = true
     @State private var closetCount = 0
     @State private var lastWeekOutfits: [Outfit] = []
+    @State private var lastVersus: Outfit?
+    @State private var versusUrls: (a: String?, b: String?) = (nil, nil)
 
     // Presentation
     @State private var openedOutfitId: String?
@@ -100,6 +106,7 @@ struct HomeView: View {
             // permanent; HomeHeader should drop the chip entirely.
             initial: String(greetingName.first.map(String.init)?.uppercased() ?? "•"),
             credits: credits.balance,
+            isPro: session.isPro || billing.isPro,
             onOpenCredits: { showCredits = true }
         )
     }
@@ -122,12 +129,20 @@ struct HomeView: View {
             )
         } else {
             latestSection
+            if let v = lastVersus, let summary = v.versusSummary {
+                HomeVersusCard(
+                    outfit: v,
+                    summary: summary,
+                    aUrl: versusUrls.a,
+                    bUrl: versusUrls.b,
+                    onOpen: { if let id = v.id { openedOutfitId = id } }
+                )
+            }
             PrimaryButton(title: "✦ Score a look", action: {
                 Haptic.tap()
                 showScoreSheet = true
             })
             HomeWeeklyWrappedCard(lastWeekOutfits: lastWeekOutfits)
-            StyleChallengeCard(title: StyleChallenges.current())
             SundayLetterPreviewCard(
                 letter: sundayLetter,
                 isPro: session.isPro,
@@ -288,6 +303,14 @@ struct HomeView: View {
             }
         }
         recentUrls = urls
+        lastVersus = try? await Repo.shared.latestVersus()
+        if let summary = lastVersus?.versusSummary {
+            async let a = Repo.shared.signedOutfitUrl(summary.aPath)
+            async let b = Repo.shared.signedOutfitUrl(summary.bPath)
+            versusUrls = ((try? await a) ?? nil, (try? await b) ?? nil)
+        } else {
+            versusUrls = (nil, nil)
+        }
         sundayLetter = try? await Repo.shared.latestSundayLetter()
         closetCount = (try? await Repo.shared.closetItemCount()) ?? 0
 
@@ -320,4 +343,87 @@ struct HomeView: View {
 }
 
 /// Wrap a String so it can drive an item-based sheet/cover binding.
+/// Dashboard echo of the last A vs B — the pair as it was judged, the two
+/// totals, and the call. Tapping opens the winner's journal entry.
+private struct HomeVersusCard: View {
+    let outfit: Outfit
+    let summary: VersusSummary
+    let aUrl: String?
+    let bUrl: String?
+    var onOpen: () -> Void
+
+    var body: some View {
+        Button(action: { Haptic.chip(); onOpen() }) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline) {
+                    Eyebrow(text: "Last call")
+                    Spacer()
+                    Text(judgedFor.uppercased())
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1.5)
+                        .foregroundStyle(Palette.muted)
+                        .lineLimit(1)
+                }
+                HStack(spacing: 10) {
+                    shot(url: aUrl, letter: "A", score: summary.totalA, isWinner: summary.winner == "A")
+                    shot(url: bUrl, letter: "B", score: summary.totalB, isWinner: summary.winner == "B")
+                }
+                if let call = outfit.hem_comment, !call.isEmpty {
+                    Text(call)
+                        .font(Serif.body(14))
+                        .foregroundStyle(Palette.ink)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Palette.card)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var judgedFor: String {
+        let what = summary.intent?.isEmpty == false ? "your note" : summary.occasion
+        return what.isEmpty ? "A vs B" : "Judged for \(what)"
+    }
+
+    private func shot(url: String?, letter: String, score: Int, isWinner: Bool) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            Color.clear
+                .aspectRatio(1.15, contentMode: .fit)
+                .overlay(Palette.paper)
+                .overlay(
+                    Group {
+                        if let s = url, let u = URL(string: s) {
+                            AsyncImage(url: u) { $0.resizable().scaledToFill() } placeholder: { Color.clear }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                )
+                .overlay(LinearGradient(colors: [.clear, .black.opacity(0.5)], startPoint: .center, endPoint: .bottom))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(isWinner ? Palette.bronze : Palette.hairline, lineWidth: isWinner ? 2 : 1)
+                )
+            HStack(alignment: .bottom) {
+                Text(isWinner ? "WINNER" : letter)
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(1.5)
+                    .foregroundStyle(.white)
+                Spacer(minLength: 4)
+                Text("\(score)")
+                    .font(Serif.display(20))
+                    .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 6)
+        }
+    }
+}
+
 private struct IdentifiableString: Identifiable, Hashable { let id: String }

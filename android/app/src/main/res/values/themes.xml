@@ -1,5 +1,21 @@
 <resources>
     <style name="Theme.FitScoreHem" parent="android:Theme.Material.Light.NoActionBar">
+        <!--
+            Cream window background so the launch window (drawn before MainActivity runs) matches
+            HemColors.Paper instead of flashing the platform default.
+        -->
+        <item name="android:windowBackground">#F3EEE4</item>
+
+        <!--
+            The bar attributes below are DEPRECATED and ignored from API 35 onwards, where
+            edge-to-edge is enforced. From API 35 the bar appearance comes exclusively from
+            enableEdgeToEdge(SystemBarStyle.light(...)) in MainActivity.onCreate.
+
+            They are intentionally kept (rather than moved to values-v34/) because on API 26–34
+            they still colour the system bars during the launch window — i.e. after the theme is
+            applied but before enableEdgeToEdge runs — which avoids a black/grey bar flash on
+            older devices. On API 35+ they are simply inert.
+        -->
         <item name="android:statusBarColor">#F3EEE4</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:navigationBarColor">#F3EEE4</item>

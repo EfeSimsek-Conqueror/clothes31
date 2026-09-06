@@ -15,6 +15,8 @@ object Route {
     const val You = "you"
     const val ScoreSheet = "score_sheet"
     const val StudioCreate = "studio/create"
+    /** Studio 2.0 — sequential full-outfit wizard (iOS `OutfitWizardView`). */
+    const val StudioOutfit = "studio/outfit"
     const val WeeklyLetter = "weekly_letter"
     const val StyleProfile = "style_profile"
     const val Appearance = "appearance"
@@ -25,7 +27,7 @@ object Route {
     const val Camera = "camera"
     const val TryOn = "tryon"
     const val Versus = "versus"
-    const val Roast = "roast"
+    const val StylistChat = "stylist_chat"
     const val Decode = "decode"
     // Sprint-era additions (parity with iOS)
     const val CoverTemplate = "cover_template"

@@ -35,6 +35,7 @@ enum Supa {
     static let scoreCost = 5
     static let generateCost = 15
     static let tryonCost = 20
+    /// Re-render the same try-on result restyled for another season.
     static let versusCost = 8
     static let roastCost = 5
     static let decodeCost = 10

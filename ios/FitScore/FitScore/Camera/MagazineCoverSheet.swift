@@ -39,6 +39,8 @@ struct MagazineCoverSheet: View {
     @State private var busy = false
     @State private var error: String?
     @State private var cover: ComposeCoverResponse?
+    /// Row written by the finished run — its output opens over this sheet.
+    @State private var justSavedId: String?
 
     // Likeness consent — asked once, then remembered. Gate sits in front of
     // every compose, including the one launched from the Edit sheet.
@@ -65,6 +67,10 @@ struct MagazineCoverSheet: View {
     @FocusState private var promptFocused: Bool
 
     var body: some View {
+        coverBody.justSaved($justSavedId)
+    }
+
+    private var coverBody: some View {
         ZStack {
             Palette.paper.ignoresSafeArea()
             ScrollView {
@@ -599,11 +605,40 @@ struct MagazineCoverSheet: View {
                 try? await Repo.shared.spendCredits(amount: cost, kind: "magazine_cover")
                 Haptic.soft()
                 cover = resp
+                // Covers only ever landed in `magazine_covers`, so a finished
+                // cover never appeared in the journal beside the other tools.
+                justSavedId = await saveCoverToJournal(resp)
             } catch {
                 self.error = error.localizedDescription
                 toasts.post("Cover failed: \(error.localizedDescription)")
             }
         }
+    }
+
+    /// Mirror the cover into `outfits` so it shows up in the journal and opens
+    /// with the rest of the tool outputs. The canonical row stays in
+    /// `magazine_covers`; this is the index entry.
+    @discardableResult
+    private func saveCoverToJournal(_ resp: ComposeCoverResponse) async -> String? {
+        guard let uid = Repo.shared.userId, let url = resp.cover_url else { return nil }
+        guard let bytes = try? await Repo.shared.downloadBytes(url),
+              let path = try? await Repo.shared.uploadOutfitPhoto(bytes: bytes, ext: "png")
+        else { return nil }
+        var meta: [String: JSONValue] = [:]
+        if let h = resp.headline { meta["headline"] = .string(h) }
+        if let q = resp.pull_quote { meta["pull_quote"] = .string(q) }
+        if let v = resp.vol_number { meta["vol_number"] = .number(Double(v)) }
+        if let cid = resp.cover_id { meta["cover_id"] = .string(cid) }
+        let row = try? await Repo.shared.insertOutfit(OutfitInsert(
+            user_id: uid,
+            photo_path: path,
+            score: 0.0,
+            occasion: "Cover",
+            hem_comment: resp.headline ?? "Magazine cover",
+            kind: "magazine_cover",
+            signals: .object(["cover": .object(meta)])
+        ))
+        return row?.id
     }
 
     private func regenHeadline() {

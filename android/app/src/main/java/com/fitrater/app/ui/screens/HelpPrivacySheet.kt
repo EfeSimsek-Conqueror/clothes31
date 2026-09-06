@@ -46,6 +46,7 @@ import com.fitrater.app.ui.theme.HemSpace
 import com.fitrater.app.ui.theme.HemType
 import com.fitrater.app.ui.theme.SerifDisplay
 import com.fitrater.app.util.ToastBus
+import com.fitrater.app.util.openExternal
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -114,14 +115,8 @@ fun HelpPrivacySheetContent(
                 val uri = android.net.Uri.parse("market://details?id=com.fitrater.app")
                 val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 runCatching { context.startActivity(intent) }.onFailure {
-                    runCatching {
-                        context.startActivity(
-                            Intent(
-                                Intent.ACTION_VIEW,
-                                android.net.Uri.parse("https://play.google.com/store/apps/details?id=com.fitrater.app"),
-                            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                        )
-                    }
+                    // No Play Store app — fall back to the web listing in a Custom Tab.
+                    openExternal(context, "https://play.google.com/store/apps/details?id=com.fitrater.app")
                 }
             },
         )
@@ -234,12 +229,9 @@ fun HelpPrivacySheetContent(
     }
 }
 
+/** Custom Tab, not ACTION_VIEW — every fitrater.ai URL is an autoVerify'd App Link for us. */
 private fun openUrl(context: Context, url: String) {
-    runCatching {
-        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
-    }.onFailure { ToastBus.post("Couldn't open link.") }
+    openExternal(context, url)
 }
 
 @Composable

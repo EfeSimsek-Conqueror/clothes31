@@ -31,7 +31,7 @@ export function PhoneFrame({
           <div className="hidden md:flex items-center justify-between px-6 pt-3 pb-1 text-[11px] tracking-widest text-ink/70 font-medium">
             <span>9:41</span>
             <span className="h-1.5 w-16 rounded-full bg-ink/20" />
-            <span className="uppercase">FitScore</span>
+            <span className="uppercase">Fitrater</span>
           </div>
         ) : null}
         {children}

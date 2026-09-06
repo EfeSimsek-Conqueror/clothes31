@@ -7,6 +7,7 @@ import com.revenuecat.purchases.CustomerInfo
 import com.revenuecat.purchases.LogLevel
 import com.revenuecat.purchases.Offering
 import com.revenuecat.purchases.Package
+import com.revenuecat.purchases.PeriodType
 import com.revenuecat.purchases.Purchases
 import com.revenuecat.purchases.PurchasesConfiguration
 import com.revenuecat.purchases.PurchaseParams
@@ -15,6 +16,7 @@ import com.revenuecat.purchases.awaitLogIn
 import com.revenuecat.purchases.awaitLogOut
 import com.revenuecat.purchases.awaitOfferings
 import com.revenuecat.purchases.awaitPurchase
+import com.revenuecat.purchases.awaitRestore
 import com.revenuecat.purchases.interfaces.UpdatedCustomerInfoListener
 import com.revenuecat.purchases.models.StoreTransaction
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +35,10 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 object RcBilling {
     private const val TAG = "RcBilling"
-    const val ENTITLEMENT_PRO = "pro"
+    // Must match the entitlement lookup_key in RevenueCat ("fitscore_pro") and
+    // iOS RcBilling.swift. Reading "pro" here silently never resolved — a paid
+    // subscriber would purchase successfully and still not unlock Pro.
+    const val ENTITLEMENT_PRO = "fitscore_pro"
 
     private var configured = false
 
@@ -119,6 +124,35 @@ object RcBilling {
         return PurchaseResult(result.storeTransaction, result.customerInfo)
     }
 
+    /** Outcome of [restore]. Nested so call sites read `RcBilling.RestoreResult` without an extra import. */
+    sealed class RestoreResult {
+        /** The store answered. No active entitlement here means the account genuinely owns nothing. */
+        data class Success(val customerInfo: CustomerInfo) : RestoreResult()
+        /** Network/store error, or RC was never configured. [cause] is null in the latter case. */
+        data class Failed(val cause: Throwable?) : RestoreResult()
+    }
+
+    /**
+     * Ask the store to re-deliver past purchases for the current account.
+     *
+     * Failure and "restored nothing" are separate results on purpose: Billing 8 dropped
+     * expired-subscription visibility, so restore is the only path back to Pro on a new
+     * device — telling a paying subscriber "no purchases found" after a network blip
+     * looks like their subscription vanished.
+     */
+    suspend fun restore(): RestoreResult {
+        if (!configured) return RestoreResult.Failed(null)
+        return runCatching {
+            Purchases.sharedInstance.awaitRestore().also { publish(it) }
+        }.fold(
+            onSuccess = { RestoreResult.Success(it) },
+            onFailure = {
+                Log.w(TAG, "restore failed", it)
+                RestoreResult.Failed(it)
+            },
+        )
+    }
+
     suspend fun refreshCustomerInfo(): CustomerInfo? {
         if (!configured) return null
         return runCatching {
@@ -129,13 +163,19 @@ object RcBilling {
     fun isPro(info: CustomerInfo? = _customerInfo.value): Boolean =
         _serverPro.value || info?.entitlements?.get(ENTITLEMENT_PRO)?.isActive == true
 
-    /** True if the user is inside the 7-day intro (free trial) window of the annual sub. */
+    /**
+     * True if the user is inside the 7-day free-trial window of the annual sub.
+     *
+     * Play free trials come back as [PeriodType.TRIAL]; [PeriodType.INTRO] is discounted
+     * paid intro pricing, which we don't sell — matching INTRO here meant this was always
+     * false and the trial daily cap never fired.
+     */
     suspend fun isInTrial(): Boolean {
         if (!configured) return false
         return runCatching {
             val info = Purchases.sharedInstance.awaitCustomerInfo()
             val ent = info.entitlements[ENTITLEMENT_PRO]
-            ent?.isActive == true && ent.periodType?.name == "INTRO"
+            ent != null && ent.isActive && ent.periodType == PeriodType.TRIAL
         }.getOrDefault(false)
     }
 }

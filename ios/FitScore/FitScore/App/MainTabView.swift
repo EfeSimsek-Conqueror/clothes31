@@ -22,6 +22,8 @@ struct MainTabView: View {
     @State private var showYouSheet = false
     @State private var showCreditsSheet = false
     @State private var showPaywall = false
+    /// Outfit to open after a score completes — see `onScored` below.
+    @State private var scoredOutfitId: String? = nil
     @ObservedObject private var cameraBus = CameraMenuBus.shared
 
     var body: some View {
@@ -55,11 +57,27 @@ struct MainTabView: View {
             switch flow {
             case .score:
                 ScoreSheetView(onClose: { cameraBus.pending = nil },
-                               onScored: { _ in cameraBus.pending = nil },
+                               onScored: { id in
+                                   // "See breakdown" used to drop the id on the floor and
+                                   // just dismiss, landing the user back on the dashboard.
+                                   // Open the detail for the fit that was scored — after the
+                                   // scoring cover has finished dismissing, since two
+                                   // presentations in the same tick cancel each other out.
+                                   cameraBus.pending = nil
+                                   DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                       scoredOutfitId = id
+                                   }
+                               },
                                onOpenPaywall: { cameraBus.request(.paywall, context: nil) })
             case .tryon:
                 TryOnView(onClose: { cameraBus.pending = nil },
-                          onOpenPaywall: { cameraBus.request(.paywall, context: .tryon) })
+                          onOpenPaywall: { cameraBus.request(.paywall, context: .tryon) },
+                          onOpenStudioCreate: {
+                              // Two presentations in one runloop tick cancel each
+                              // other out — same 0.35s workaround used above.
+                              cameraBus.pending = nil
+                              DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { tab = .studio }
+                          })
             case .versus:
                 VersusView(onClose: { cameraBus.pending = nil },
                            onOpenPaywall: { cameraBus.request(.paywall, context: nil) })
@@ -82,8 +100,21 @@ struct MainTabView: View {
                              paywallContext: cameraBus.paywallContext?.rawValue)
             }
         }
+        .fullScreenCover(item: scoredOutfitBinding) { ref in
+            ScoreDetailView(outfitId: ref.id, onClose: { scoredOutfitId = nil })
+        }
+    }
+
+    /// Bridges the optional id into SwiftUI's `item:` presentation API.
+    private var scoredOutfitBinding: Binding<ScoredOutfitRef?> {
+        Binding(
+            get: { scoredOutfitId.map { ScoredOutfitRef(id: $0) } },
+            set: { if $0 == nil { scoredOutfitId = nil } }
+        )
     }
 }
+
+private struct ScoredOutfitRef: Identifiable, Hashable { let id: String }
 
 private struct TabBar: View {
     @Binding var tab: MainTabView.Tab

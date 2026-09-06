@@ -43,6 +43,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -91,7 +92,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val GEN_COST = 15
+// Studio 2.0 single-piece pricing — must stay in sync with iOS (Supa.singlePieceCost).
+// Was a hardcoded 15 (Supa.GENERATE_COST); Studio now bills the cheaper single-piece rate.
+private const val GEN_COST = com.fitrater.app.data.Supa.SINGLE_PIECE_COST
 
 // ---------- Static option tables (kept top-level for reuse and testability) ----------
 
@@ -146,6 +149,46 @@ private val BAG_HARDWARE = listOf("Gold", "Silver", "Matte black", "None")
 
 private fun subtypeNeedsShoeHeight(subtype: String?): Boolean =
     subtype == "Boots" || subtype == "Heels"
+
+// Subtype-specific option pools (Aug 2026) — kept 1:1 with iOS StudioCreateView.swift.
+private val NECKLINES = listOf(
+    "Crew", "V-neck", "Scoop", "Boat", "Square", "Henley", "Sweetheart", "Off-shoulder", "Halter", "Turtle",
+)
+private val HOODIE_CLOSURES = listOf("Pullover", "Zip-up", "Half-zip")
+private val HOODIE_DRAWSTRING = listOf("With drawstring", "No drawstring")
+private val CARDIGAN_CLOSURES = listOf("Buttoned", "Open-front", "Zip", "Belted")
+private val BLAZER_LAPELS = listOf("Notch", "Peak", "Shawl", "Collarless")
+private val BLAZER_BUTTONS = listOf("1-button", "2-button", "3-button", "Double-breasted")
+private val SHIRT_COLLARS = listOf("Point", "Spread", "Button-down", "Cuban", "Band", "Mandarin")
+private val WAIST_RISES = listOf("Low", "Mid", "High")
+private val PANT_FITS = listOf("Skinny", "Slim", "Straight", "Wide", "Bootcut", "Flared", "Baggy")
+
+/** Which subtypes get a Neckline question after Sleeve/Length. */
+private val NECKLINE_SUBTYPES = setOf(
+    "T-shirt", "Tank", "Polo", "Turtleneck",
+    "Mini", "Midi", "Maxi", "Slip", "Wrap", "Shirt-dress",
+)
+private fun subtypeUsesNeckline(subtype: String?): Boolean =
+    subtype != null && subtype in NECKLINE_SUBTYPES
+
+/** Constrain neckline options per subtype. */
+private fun necklineOptionsFor(subtype: String?): List<String> = when (subtype) {
+    "Tank" -> listOf("Scoop", "V-neck", "Square", "Halter", "Racerback")
+    "Polo" -> listOf("Polo collar") // effectively fixed but shown for clarity
+    "Turtleneck" -> listOf("Turtle", "Mock-neck")
+    "T-shirt" -> listOf("Crew", "V-neck", "Scoop", "Boat", "Henley")
+    else -> NECKLINES
+}
+
+private fun subtypeIsHoodie(subtype: String?): Boolean = subtype == "Hoodie"
+private fun subtypeIsCardigan(subtype: String?): Boolean = subtype == "Cardigan"
+private fun subtypeIsBlazer(subtype: String?): Boolean = subtype == "Blazer"
+private fun subtypeIsShirt(subtype: String?): Boolean = subtype == "Shirt"
+
+/** Pants-like bottoms that support waist rise + fit shape. */
+private val PANTS_LIKE_SUBTYPES = setOf("Trousers", "Jeans", "Chinos", "Cargo")
+private fun subtypeIsPantsLike(subtype: String?): Boolean =
+    subtype != null && subtype in PANTS_LIKE_SUBTYPES
 
 private data class Preset(val name: String, val hex: String)
 private val COLOR_PRESETS = listOf(
@@ -249,6 +292,16 @@ private class WizardState {
     var bagSize by mutableStateOf<String?>(null)
     var strap by mutableStateOf<String?>(null)
     var hardware by mutableStateOf<String?>(null)
+    // Subtype-specific (Aug 2026)
+    var neckline by mutableStateOf<String?>(null)
+    var hoodieClosure by mutableStateOf<String?>(null)
+    var hoodieDrawstring by mutableStateOf<String?>(null)
+    var cardiganClosure by mutableStateOf<String?>(null)
+    var blazerLapel by mutableStateOf<String?>(null)
+    var blazerButtons by mutableStateOf<String?>(null)
+    var shirtCollar by mutableStateOf<String?>(null)
+    var waistRise by mutableStateOf<String?>(null)
+    var pantFit by mutableStateOf<String?>(null)
 }
 
 /** Minimal snapshot of the wizard state to seed variation prompts. */
@@ -276,6 +329,16 @@ private data class WizardSnapshot(
     val bagSize: String? = null,
     val strap: String? = null,
     val hardware: String? = null,
+    // Subtype-specific (Aug 2026)
+    val neckline: String? = null,
+    val hoodieClosure: String? = null,
+    val hoodieDrawstring: String? = null,
+    val cardiganClosure: String? = null,
+    val blazerLapel: String? = null,
+    val blazerButtons: String? = null,
+    val shirtCollar: String? = null,
+    val waistRise: String? = null,
+    val pantFit: String? = null,
 )
 
 private fun WizardState.snapshot(mannequin: String, prefFabrics: List<String>, prefColors: List<String>) = WizardSnapshot(
@@ -302,6 +365,15 @@ private fun WizardState.snapshot(mannequin: String, prefFabrics: List<String>, p
     bagSize = bagSize,
     strap = strap,
     hardware = hardware,
+    neckline = neckline,
+    hoodieClosure = hoodieClosure,
+    hoodieDrawstring = hoodieDrawstring,
+    cardiganClosure = cardiganClosure,
+    blazerLapel = blazerLapel,
+    blazerButtons = blazerButtons,
+    shirtCollar = shirtCollar,
+    waistRise = waistRise,
+    pantFit = pantFit,
 )
 
 /** Deterministic palette shifts for the "Colors" variation axis. */
@@ -420,11 +492,39 @@ private fun renderPrompt(s: WizardSnapshot): String {
                 "sharp material and hardware detail, editorial catalog aesthetic.$trailing$prefHint"
         }
         else -> {
-            // Garments worn on mannequin.
-            "Editorial fashion photograph of a $silhouettePart $subtypeToken in $colorPart tones, " +
-                "$fabricPart$texturePart$detailsPart$lenPart, for $occasion $season wear — " +
-                "worn on a minimalist headless matte-white ${s.mannequinGender}-form mannequin against a clean cream studio backdrop, " +
-                "front-facing, magazine editorial styling, natural studio lighting, sharp fabric detail.$trailing$prefHint"
+            // Aug 2026 (v3): reverted from "young stylish model" to the classic
+            // Studio look — isolated piece on a headless mannequin. The live-model
+            // render was pulling in accompanying garments (t-shirt under a cardigan,
+            // jean shorts under a top) which is wrong for a single-piece catalog.
+            // Combining happens later, when all pieces are ready. Each piece must
+            // ship SOLO so it can be composited cleanly.
+            val subtypeBits = mutableListOf<String>()
+            s.neckline?.let { subtypeBits.add("${it.lowercase()} neckline") }
+            s.hoodieClosure?.let { subtypeBits.add(it.lowercase()) }
+            s.hoodieDrawstring?.let { if (it.lowercase().startsWith("with")) subtypeBits.add("with drawstring") }
+            s.cardiganClosure?.let { subtypeBits.add("${it.lowercase()} front") }
+            s.blazerLapel?.let { subtypeBits.add("${it.lowercase()} lapel") }
+            s.blazerButtons?.let { subtypeBits.add(it.lowercase()) }
+            s.shirtCollar?.let { subtypeBits.add("${it.lowercase()} collar") }
+            s.pantFit?.let { subtypeBits.add("${it.lowercase()} leg") }
+            s.waistRise?.let { subtypeBits.add("${it.lowercase()}-rise waist") }
+            val subtypePart = if (subtypeBits.isEmpty()) "" else ", " + subtypeBits.joinToString(", ")
+
+            // Bottoms + dresses drape naturally on a form; tops need to hang from
+            // shoulders. Either way: NO other garments, NO layered clothing.
+            // Aug 2026 v4: force FULL-BODY headless mannequin with arms visible —
+            // Fal was returning half-body / no-arm renders which broke combining.
+            val bodyForm = "worn on the standard Fitrater mannequin: a headless matte-white " +
+                "${s.mannequinGender}-form MANNEQUIN, FULL BODY visible from shoulders to feet, " +
+                "arms at sides, standing upright, front-facing, against a clean cream studio backdrop"
+
+            "Studio product photograph of a $silhouettePart $subtypeToken$subtypePart in $colorPart tones, " +
+                "$fabricPart$texturePart$detailsPart$lenPart, for $occasion $season wear, " +
+                "$bodyForm. " +
+                "The MANNEQUIN MUST show: full body, both arms attached and visible, no cropping at the arms or waist. " +
+                "ONLY the $subtypeToken is visible on the mannequin — NO t-shirt underneath, NO trousers, NO shorts, NO shoes, " +
+                "NO accompanying clothing, NO layered garments. Bare mannequin surface everywhere else. " +
+                "Soft diffused studio lighting, sharp fabric and stitching detail, editorial catalog aesthetic.$trailing$prefHint"
         }
     }
 }
@@ -439,6 +539,8 @@ private fun renderPrompt(s: WizardSnapshot): String {
  *   8=Refinement text, 9=Preview.
  *   10=Shoe sole, 11=Shoe toe, 12=Shoe height (Boots/Heels only), 13=Shoe closure.
  *   14=Bag type, 15=Bag size, 16=Bag strap, 17=Bag closure, 18=Bag hardware.
+ *   20=Neckline, 21=Hoodie closure, 22=Hoodie drawstring, 23=Cardigan closure,
+ *   24=Blazer lapel, 25=Blazer buttons, 26=Shirt collar, 27=Pant fit, 28=Waist rise.
  */
 private fun applicableSteps(type: String?, subtype: String? = null): List<Int> {
     return when (type) {
@@ -453,7 +555,23 @@ private fun applicableSteps(type: String?, subtype: String? = null): List<Int> {
             "Bag" -> listOf(1, 14, 15, 16, 17, 18, 5, 6, 7, 8, 9)
             else -> listOf(1, 4, 5, 6, 7, 8, 9)
         }
-        else -> (1..9).toList()
+        else -> {
+            // Base flow for tops / bottoms / outerwear / dresses:
+            // 1 type+ref → 2 silhouette → 3 sleeve/length → [subtype-specifics] →
+            // 4 details → 5 colors → 6 fabric → 7 occasion → 8 refinements → 9 preview.
+            val out = mutableListOf(1, 2, 3)
+
+            // Subtype-specifics — inject before Details.
+            if (subtypeUsesNeckline(subtype)) out += 20                  // Neckline
+            if (subtypeIsHoodie(subtype)) out += listOf(21, 22)          // Closure + Drawstring
+            if (subtypeIsCardigan(subtype)) out += 23                    // Cardigan closure
+            if (subtypeIsBlazer(subtype)) out += listOf(24, 25)          // Lapel + Buttons
+            if (subtypeIsShirt(subtype)) out += 26                       // Collar
+            if (subtypeIsPantsLike(subtype)) out += listOf(27, 28)       // Fit + Rise
+
+            out += listOf(4, 5, 6, 7, 8, 9)
+            out
+        }
     }
 }
 
@@ -471,6 +589,18 @@ fun StudioCreateScreen(
     presetColors: List<String> = emptyList(),
     presetFabrics: List<String> = emptyList(),
     presetReferenceUrl: String? = null,
+    /**
+     * When the caller (e.g. outfit wizard) already knows both the type and
+     * subtype, Step 1's chips render locked so the user can only pick a
+     * reference photo. Backwards-compatible: null ⇒ classic free-pick Step 1.
+     */
+    presetSubtype: String? = null,
+    /**
+     * Fired after a generated piece is successfully persisted to the closet
+     * (hero save or variation save). Lets an embedding flow — the outfit
+     * wizard — collect the produced piece per slot. Null ⇒ classic behaviour.
+     */
+    onPieceCreated: ((com.fitrater.app.data.model.ClosetItem) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -479,15 +609,22 @@ fun StudioCreateScreen(
     val state = remember {
         WizardState().apply {
             type = presetType
+            subtype = presetSubtype
             colors.addAll(presetColors)
             fabrics.addAll(presetFabrics)
             referenceUrl = presetReferenceUrl
         }
     }
+    // Step 1 chips are read-only when the caller pinned both type and subtype.
+    val step1Locked = presetType != null && presetSubtype != null
     // Step index into applicableSteps
     var stepIndex by remember { mutableStateOf(0) }
-    // Special value: -1 == Step 0 "Start from" screen
-    var atStart by remember { mutableStateOf(editingPieceId == null && presetReferenceUrl == null) }
+    // Special value: -1 == Step 0 "Start from" screen.
+    // A locked piece skips the template picker entirely — templates would
+    // overwrite the type/subtype the caller pinned.
+    var atStart by remember {
+        mutableStateOf(editingPieceId == null && presetReferenceUrl == null && !step1Locked)
+    }
 
     var referenceUploading by remember { mutableStateOf(false) }
     var mannequinGender by remember { mutableStateOf("androgynous") }
@@ -601,6 +738,16 @@ fun StudioCreateScreen(
         16 -> state.strap != null
         17 -> state.closureType != null
         18 -> state.hardware != null
+        // Subtype-specifics (Aug 2026)
+        20 -> state.neckline != null
+        21 -> state.hoodieClosure != null
+        22 -> state.hoodieDrawstring != null
+        23 -> state.cardiganClosure != null
+        24 -> state.blazerLapel != null
+        25 -> state.blazerButtons != null
+        26 -> state.shirtCollar != null
+        27 -> state.pantFit != null
+        28 -> state.waistRise != null
         else -> true
     }
 
@@ -709,7 +856,7 @@ fun StudioCreateScreen(
         return runCatching {
             val bytes = Repo.downloadBytes(url)
             val path = withContext(Dispatchers.IO) { Repo.uploadClosetPhoto(bytes, ext = "png") }
-            Repo.insertClosetItem(
+            val created = Repo.insertClosetItem(
                 ClosetItemInsert(
                     user_id = uid,
                     name = niceName(state),
@@ -719,6 +866,7 @@ fun StudioCreateScreen(
                     parent_id = editingPieceId,
                 ),
             )
+            onPieceCreated?.invoke(created)
             true
         }.getOrElse {
             Log.e("Studio", "save-variation failed", it)
@@ -755,7 +903,7 @@ fun StudioCreateScreen(
                 addedOk = false
                 error = null
                 stepIndex = 0
-                atStart = editingPieceId == null
+                atStart = editingPieceId == null && !step1Locked
             },
             onPickVariation = { url ->
                 generatedUrl = url
@@ -794,7 +942,7 @@ fun StudioCreateScreen(
                         val uid = Repo.userId ?: error("Not signed in")
                         if (editingPieceId != null) {
                             // Edits become new rows chained via parent_id, per iteration history spec.
-                            Repo.insertClosetItem(
+                            val created = Repo.insertClosetItem(
                                 ClosetItemInsert(
                                     user_id = uid,
                                     name = niceName(state),
@@ -804,9 +952,10 @@ fun StudioCreateScreen(
                                     parent_id = editingPieceId,
                                 ),
                             )
+                            onPieceCreated?.invoke(created)
                             com.fitrater.app.util.ToastBus.post("Saved as variation")
                         } else {
-                            Repo.insertClosetItem(
+                            val created = Repo.insertClosetItem(
                                 ClosetItemInsert(
                                     user_id = uid,
                                     name = niceName(state),
@@ -815,6 +964,7 @@ fun StudioCreateScreen(
                                     image_path = path,
                                 ),
                             )
+                            onPieceCreated?.invoke(created)
                             com.fitrater.app.util.ToastBus.post("Saved to Studio")
                         }
                         addedOk = true
@@ -882,7 +1032,9 @@ fun StudioCreateScreen(
                 Box(
                     Modifier
                         .clickable(onClick = {
-                            if (stepIndex == 0) atStart = editingPieceId == null else stepIndex -= 1
+                            if (stepIndex > 0) stepIndex -= 1
+                            else if (step1Locked) onBack()
+                            else atStart = editingPieceId == null
                         })
                         .padding(6.dp),
                 ) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
@@ -923,6 +1075,7 @@ fun StudioCreateScreen(
                         )
                     },
                     onRemoveRef = { state.referenceUrl = null },
+                    locked = presetType != null && presetSubtype != null,
                 )
                 2 -> ChipSingleStep(
                     title = "Silhouette",
@@ -1027,6 +1180,70 @@ fun StudioCreateScreen(
                     selected = state.hardware,
                     onSelect = { state.hardware = it },
                 )
+                // ----- Subtype-specific (Aug 2026) -----
+                20 -> ChipSingleStep(
+                    title = "Neckline",
+                    subtitle = "How does the collar sit?",
+                    options = necklineOptionsFor(state.subtype),
+                    selected = state.neckline,
+                    onSelect = { state.neckline = it },
+                )
+                21 -> ChipSingleStep(
+                    title = "Closure",
+                    subtitle = "Pullover, zipped, or half-zip?",
+                    options = HOODIE_CLOSURES,
+                    selected = state.hoodieClosure,
+                    onSelect = { state.hoodieClosure = it },
+                )
+                22 -> ChipSingleStep(
+                    title = "Drawstring",
+                    subtitle = "Hood detail.",
+                    options = HOODIE_DRAWSTRING,
+                    selected = state.hoodieDrawstring,
+                    onSelect = { state.hoodieDrawstring = it },
+                )
+                23 -> ChipSingleStep(
+                    title = "Cardigan closure",
+                    subtitle = "How does the front sit?",
+                    options = CARDIGAN_CLOSURES,
+                    selected = state.cardiganClosure,
+                    onSelect = { state.cardiganClosure = it },
+                )
+                24 -> ChipSingleStep(
+                    title = "Lapel",
+                    subtitle = "Lapel style.",
+                    options = BLAZER_LAPELS,
+                    selected = state.blazerLapel,
+                    onSelect = { state.blazerLapel = it },
+                )
+                25 -> ChipSingleStep(
+                    title = "Buttons",
+                    subtitle = "How many, and single or double breasted?",
+                    options = BLAZER_BUTTONS,
+                    selected = state.blazerButtons,
+                    onSelect = { state.blazerButtons = it },
+                )
+                26 -> ChipSingleStep(
+                    title = "Collar",
+                    subtitle = "Collar style.",
+                    options = SHIRT_COLLARS,
+                    selected = state.shirtCollar,
+                    onSelect = { state.shirtCollar = it },
+                )
+                27 -> ChipSingleStep(
+                    title = "Fit",
+                    subtitle = "Overall leg shape.",
+                    options = PANT_FITS,
+                    selected = state.pantFit,
+                    onSelect = { state.pantFit = it },
+                )
+                28 -> ChipSingleStep(
+                    title = "Waist rise",
+                    subtitle = "Where does the waistband sit?",
+                    options = WAIST_RISES,
+                    selected = state.waistRise,
+                    onSelect = { state.waistRise = it },
+                )
             }
             }
 
@@ -1045,7 +1262,9 @@ fun StudioCreateScreen(
             canAdvance = canAdvance(),
             hasReference = !state.referenceUrl.isNullOrBlank(),
             onBack = {
-                if (stepIndex == 0) atStart = editingPieceId == null else stepIndex -= 1
+                if (stepIndex > 0) stepIndex -= 1
+                else if (step1Locked) onBack()
+                else atStart = editingPieceId == null
             },
             onNext = { if (canAdvance()) stepIndex += 1 },
             onGenerate = { scope.launch { runGeneration() } },
@@ -1252,18 +1471,32 @@ private fun Step1TypeAndReference(
     referenceUploading: Boolean,
     onImportRef: () -> Unit,
     onRemoveRef: () -> Unit,
+    /**
+     * When true (outfit wizard preselected both type + subtype), render the
+     * Type + Subcategory rows as read-only chips — the only interactive
+     * control on this step is the reference photo picker.
+     */
+    locked: Boolean = false,
 ) {
     Column {
-        Text("What are we making?", style = HemType.serifSection)
+        Text(if (locked) "Confirming the piece" else "What are we making?", style = HemType.serifSection)
+        if (locked) {
+            Spacer(Modifier.height(HemSpace.xs))
+            Text(
+                "Type and subcategory are set by the outfit — you can only add a reference photo here.",
+                style = HemType.bodyMuted.copy(fontSize = 13.sp),
+            )
+        }
         Spacer(Modifier.height(HemSpace.md))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             TYPES.forEach { t ->
-                Chip(
+                LockableChip(
                     text = t,
                     active = state.type == t,
+                    locked = locked,
                     onClick = {
                         if (state.type != t) {
                             state.type = t
@@ -1283,7 +1516,12 @@ private fun Step1TypeAndReference(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 subs.forEach { s ->
-                    Chip(text = s, active = state.subtype == s, onClick = { state.subtype = s })
+                    LockableChip(
+                        text = s,
+                        active = state.subtype == s,
+                        locked = locked,
+                        onClick = { state.subtype = s },
+                    )
                 }
             }
         }
@@ -1805,6 +2043,54 @@ private fun Chip(text: String, active: Boolean, onClick: () -> Unit) {
             text,
             style = HemType.body.copy(
                 color = if (active) Color.White else HemColors.Ink,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+            ),
+        )
+    }
+}
+
+/**
+ * Chip variant used by Step 1 when the caller preselected type + subtype.
+ * The active chip stays legible with a lock glyph so the user can tell what
+ * was preselected; the rest fade out and stop taking taps.
+ */
+@Composable
+private fun LockableChip(
+    text: String,
+    active: Boolean,
+    locked: Boolean,
+    onClick: () -> Unit,
+) {
+    if (!locked) {
+        Chip(text = text, active = active, onClick = onClick)
+        return
+    }
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (active) HemColors.Ink else Color.Transparent)
+            .border(
+                1.dp,
+                if (active) HemColors.Ink.copy(alpha = 0.9f) else HemColors.Ink.copy(alpha = 0.15f),
+                RoundedCornerShape(999.dp),
+            )
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (active) {
+            Icon(
+                Icons.Default.Lock,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(11.dp),
+            )
+            Spacer(Modifier.width(4.dp))
+        }
+        Text(
+            text,
+            style = HemType.body.copy(
+                color = if (active) Color.White else HemColors.Ink.copy(alpha = 0.25f),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
             ),

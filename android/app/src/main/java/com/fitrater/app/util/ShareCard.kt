@@ -25,49 +25,6 @@ object ShareCard {
     private val muted = Color.parseColor("#6B6459")
 
     /**
-     * Roast share card: full-bleed photo top, pull-quote below, hem attribution + brand.
-     * Returns a content:// URI to the generated JPEG (cached under `roasts/`).
-     */
-    fun renderRoast(context: Context, photoBytes: ByteArray, quote: String): Uri {
-        val bm = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
-        val c = Canvas(bm)
-        c.drawColor(cream)
-
-        val photo = BitmapFactory.decodeByteArray(photoBytes, 0, photoBytes.size)
-        if (photo != null) {
-            val photoH = (H * 0.62f).toInt()
-            val src = centerCropRect(photo, W, photoH)
-            val dst = Rect(0, 0, W, photoH)
-            c.drawBitmap(photo, src, dst, Paint(Paint.FILTER_BITMAP_FLAG))
-        }
-
-        val quotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = ink
-            typeface = Typeface.create(Typeface.SERIF, Typeface.ITALIC)
-            textSize = 62f
-            isSubpixelText = true
-        }
-        drawWrappedText(c, "“$quote”", quotePaint, 96f, (H * 0.66f), W - 192f, 76f)
-
-        val attrPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = muted
-            typeface = Typeface.create(Typeface.SERIF, Typeface.ITALIC)
-            textSize = 40f
-        }
-        c.drawText("— Hem", 96f, (H - 220f), attrPaint)
-
-        val brand = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = bronze
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textSize = 32f
-            letterSpacing = 0.2f
-        }
-        c.drawText("FITRATER", 96f, (H - 120f).toFloat(), brand)
-
-        return writeBitmap(context, bm, subdir = "roasts")
-    }
-
-    /**
      * Versus share card: 2 side-by-side photos with WINNER badge, scores + comment.
      */
     fun renderVersus(

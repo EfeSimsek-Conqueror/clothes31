@@ -21,9 +21,9 @@ android {
     defaultConfig {
         applicationId = "com.fitrater.app"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 8
-        versionName = "1.0.6"
+        targetSdk = 36
+        versionCode = 9
+        versionName = "1.1.0"
     }
 
     signingConfigs {
@@ -80,6 +80,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.navigation:navigation-compose:2.8.4")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
+    // Chrome Custom Tabs — external links must not bounce back into our own
+    // App Links intent-filter (https://fitrater.ai/* is autoVerify'd).
+    implementation("androidx.browser:browser:1.8.0")
 
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -119,8 +122,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
-    // RevenueCat — Play Billing wrapper
-    implementation("com.revenuecat.purchases:purchases:8.8.0")
+    // RevenueCat — Play Billing wrapper.
+    // v10 pulls com.android.billingclient:billing:8.3.0. Play requires Billing 8+
+    // for all uploads from 2026-08-31; do not drop below v9.
+    implementation("com.revenuecat.purchases:purchases:10.16.2")
 
     // Firebase Crashlytics
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))

@@ -1,18 +1,31 @@
 # Fitrater — Release keystore
 
-**Do not commit** `keystore/fitrater-release.jks` or `keystore.properties`. Back up the `.jks` file offline (iCloud, 1Password, physical drive). Losing it means you cannot ship an update to this Play Store listing.
+**Do not commit** `keystore/fitrater-release.jks`, `keystore.properties`, or this file. Back up the `.jks` file offline (iCloud, 1Password, physical drive). Losing it means you cannot ship an update to this Play Store listing.
 
 ## Location
 - Keystore: `/Users/efe/clothes31/android/keystore/fitrater-release.jks`
 - Properties: `/Users/efe/clothes31/android/keystore.properties`
 
 ## Credentials
-- Store password: `F1trater!Release2026`
-- Key alias: `fitrater`
-- Key password: `F1trater!Release2026`
+
+Not written down here — this file has been committed before, so treat anything in it as public.
+
+- Store password: 1Password → "Fitrater upload keystore" → password field. In CI: `ANDROID_KEYSTORE_PASSWORD`.
+- Key alias: 1Password, same item, username field. In CI: `ANDROID_KEY_ALIAS`.
+- Key password: 1Password, same item, `keyPassword` custom field. In CI: `ANDROID_KEY_PASSWORD`.
 - Validity: 10,000 days
 
+`app/build.gradle.kts` reads these from `android/keystore.properties` (`storePassword`, `keyAlias`, `keyPassword`), which is gitignored. Recreate it locally from the password-manager entry; never paste the values into a tracked file.
+
+Verify the local keystore still matches the fingerprints below:
+
+```
+keytool -list -v -keystore android/keystore/fitrater-release.jks -alias <alias>
+```
+
 ## Fingerprints (upload signing cert)
+
+Public information — safe to keep here.
 
 ```
 SHA1  : 2E:FF:62:D0:23:0D:29:5C:F7:DD:60:AE:95:12:B8:D9:F3:CE:2E:BC
@@ -38,3 +51,5 @@ After enrolling, Play Console → **Setup → App integrity** shows both:
 - Upload key certificate (this JKS)
 
 Add the App signing key SHA-1 (from Play Console) to Google OAuth as well, otherwise Google Sign-In will fail on the Play-installed build.
+
+Because the old upload-key password was committed to this repo, the fingerprints above are only trustworthy until you rotate: request an **upload key reset** in Play Console (Setup → App integrity → Upload key certificate → Request upload key reset), then replace the JKS, the password-manager entry, and the fingerprints in this file and in Google OAuth.

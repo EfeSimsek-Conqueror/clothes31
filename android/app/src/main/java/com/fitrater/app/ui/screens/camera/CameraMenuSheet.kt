@@ -25,10 +25,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -62,7 +62,7 @@ fun CameraMenuSheet(
     onPickScore: () -> Unit,
     onPickTryOn: () -> Unit,
     onPickVersus: () -> Unit,
-    onPickRoast: () -> Unit,
+    onPickChat: () -> Unit,
     onPickDecode: () -> Unit,
     onPickComposeCover: () -> Unit = {},
     onOpenPaywall: () -> Unit = {},
@@ -139,16 +139,16 @@ fun CameraMenuSheet(
         )
         MenuHairline()
         AccordionRow(
-            id = "roast",
-            icon = Icons.Filled.LocalFireDepartment,
-            title = "Roast this",
-            subtitle = "Brutal mode, shareable card.",
-            cost = "${Supa.ROAST_COST} credits",
-            description = "Brutal mode, locked. Hem roasts the outfit, never the person, and always ends with a fix.",
-            needs = "1 photo.",
-            open = openId == "roast",
-            onTap = { toggle("roast") },
-            onGo = { onPickRoast() },
+            id = "chat",
+            icon = Icons.Filled.ChatBubbleOutline,
+            title = "Chat with Hem",
+            subtitle = "Ask anything — photo optional.",
+            cost = "Free",
+            description = "Ask Hem anything — send a fit photo or describe the occasion.",
+            needs = "Nothing. A photo helps.",
+            open = openId == "chat",
+            onTap = { toggle("chat") },
+            onGo = { onPickChat() },
         )
         MenuHairline()
         AccordionRow(
@@ -178,6 +178,22 @@ fun CameraMenuSheet(
         )
         MenuHairline()
         Spacer(Modifier.height(HemSpace.xl))
+    }
+}
+
+/** Shared ghost/secondary button used across the camera flow screens. */
+@Composable
+internal fun OutlinedRow(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .border(1.dp, HemColors.Ink.copy(alpha = 0.5f), RoundedCornerShape(999.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = HemType.body.copy(fontWeight = FontWeight.Medium))
     }
 }
 

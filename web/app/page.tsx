@@ -14,7 +14,7 @@ export default function LandingPage() {
       {/* Nav */}
       <header className="relative z-10 mx-auto max-w-6xl px-6 pt-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="serif text-xl">FitScore</span>
+          <span className="serif text-xl">Fitrater</span>
           <span className="text-[0.6rem] uppercase tracking-[0.24em] text-bronze">
             / Hem
           </span>
@@ -32,7 +32,7 @@ export default function LandingPage() {
       {/* Hero — mirrors the Splash screen */}
       <section className="relative z-10 mx-auto max-w-6xl px-6 pt-20 pb-24 grid md:grid-cols-12 gap-12 items-end">
         <div className="md:col-span-7">
-          <Eyebrow className="mb-8 block">FitScore</Eyebrow>
+          <Eyebrow className="mb-8 block">Fitrater</Eyebrow>
           <SerifDisplay size="hero" className="mb-6">
             Your closet,
             <br />
@@ -172,7 +172,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="relative z-10 mx-auto max-w-6xl px-6 py-10 border-t hairline flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-xs text-muted">
-        <div className="serif text-ink">FitScore · Hem</div>
+        <div className="serif text-ink">Fitrater · Hem</div>
         <div className="uppercase tracking-[0.22em]">
           © {new Date().getFullYear()} — Printed on paper stock
         </div>

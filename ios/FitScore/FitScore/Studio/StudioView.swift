@@ -6,6 +6,7 @@ import PhotosUI
 /// horizontal per-category rails; footer offers Import / Create-new actions.
 struct StudioView: View {
     @StateObject private var credits = CreditsBus.shared
+    @StateObject private var closet = ClosetBus.shared
 
     @State private var items: [ClosetItem] = []
     @State private var imageUrls: [String: String] = [:]
@@ -81,6 +82,12 @@ struct StudioView: View {
             await credits.refresh()
             await refresh()
             loaded = true
+        }
+        // The create flow opens over this grid, so `.task` never runs again on
+        // the way back and a piece the wearer just designed is missing from
+        // their own closet until they leave and return.
+        .onChange(of: closet.revision) { _, _ in
+            Task { await refresh() }
         }
         .fullScreenCover(isPresented: $showCreate) {
             // Studio 2.0 gateway (Aug 2026): picks single-piece vs outfit wizard.
@@ -314,10 +321,12 @@ struct StudioView: View {
                             .padding(.horizontal, 20)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
-                                ForEach(list, id: \.id) { it in
+                                ForEach(Array(list.enumerated()), id: \.element.id) { idx, it in
                                     Button { selected = it } label: {
                                         pieceCard(it, imageUrl: it.id.flatMap { imageUrls[$0] })
-                                    }.buttonStyle(.plain)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .wardrobeEntrance(index: idx)
                                 }
                             }
                             .padding(.horizontal, 20)
@@ -337,7 +346,11 @@ struct StudioView: View {
                     AsyncImage(url: u) { phase in
                         switch phase {
                         case .success(let img):
-                            img.resizable().scaledToFill()
+                            // Fit, not fill: a garment cropped to a tile loses the
+                            // hem, the sleeve or the shoulder — the exact things
+                            // the piece is recognised by. The colour gradient
+                            // behind it carries the empty space.
+                            img.resizable().scaledToFit()
                         default:
                             Color.clear
                         }

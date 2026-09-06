@@ -1,33 +1,59 @@
 // deno-lint-ignore-file no-explicit-any
-// score-outfit v3: adds annotation markup (arrow/line/focus/swap),
-// fit_map (16x32 tension grid + hotspots), fits_you (personalized fit score
-// when body_profile provided), intent-aware critique, and back-view scoring.
-// Proxies to Fal.ai vision LLM to score an outfit photo as Hem.
+// score-outfit v4 — "the brief dial".
+//
+// What changed, and why: in v3 the occasion was a word spliced into a prompt and
+// the four subscores were fixed, so a wedding and a Tuesday were graded on the
+// same axes with the same weights and nothing the user picked could move the
+// number except by nudging the model's mood. v4 splits the work in two. The
+// model is a WITNESS: it scores eight named axes with evidence, reports where
+// the outfit itself sits on a formality ladder, and lists literal observations.
+// The server is the JUDGE: it owns every weight, every cap and every floor, and
+// it computes the dress-code axis outright as the distance between what the
+// wearer asked for and what the photograph reads.
+//
+// Wire compatibility is absolute. `score`, `subscores` (four numeric keys),
+// `hem_comment`, `swaps` (flat strings) and `annotations` keep their exact v3
+// types forever — shipped iOS and Android builds hard-fail without them. The
+// v4 payload is additive and gated on `client_features: ["axes_v4"]`, never on
+// the response `version`, because neither shipped client reads it.
+
+import { primaryAxes } from "../_shared/rubric/weights.ts";
+import { briefLine, rubricId, rubricLabel } from "../_shared/rubric/brief.ts";
+import {
+  FORMALITY_CAPTIONS,
+  PRESENCE_CAPTIONS,
+  RUBRIC_VERSION,
+} from "../_shared/rubric/rubric.v4.ts";
+import { AXIS_LABELS } from "../_shared/rubric/rubric.v4.ts";
+import type { AxisKey, Intake } from "../_shared/rubric/types.ts";
+import { parseRequest } from "./intake.ts";
+import { call, hasModelKey } from "./model.ts";
+import {
+  DRAW_PROMPT,
+  JUDGE_SYSTEM,
+  judgePrompt,
+  judgeSchema,
+  RESPONSE_SHAPE,
+  SIGNALS_LIST_INSTRUCTION,
+} from "./prompt.ts";
+import { runEngine, type JudgeInput } from "./engine.ts";
+import { normalizeJudge, toSignalMap } from "./judge.ts";
+import { legacyAnnotations, legacySwaps, normalizeSwaps, type SwapV2 } from "./legacy.ts";
+import type { SignalMap } from "./rules.ts";
+import {
+  sanitizeFitMap,
+  sanitizeMarkupAnnotations,
+  sanitizePalette,
+  sanitizePieces,
+} from "./sanitize.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Aug 2026: only one honesty tone shipped — honest/constructive. Kind + brutal
-// removed per product decision. Any legacy client request with honesty="kind"
-// or honesty="brutal" is silently coerced to "honest" (see resolveHonesty).
-const HONESTY_LINES: Record<string, string> = {
-  honest:
-    "Be direct and specific. Praise real strengths, name real weaknesses. Always end with one concrete fix. Never insult the person — only the clothes.",
-};
-
-function resolveHonesty(input: unknown): string {
-  // Everything collapses to "honest" now. Keep the field on the request for
-  // backward compat with older iOS/Android builds still in the wild.
-  return "honest";
-}
-
-const MARKUP_TYPES = new Set(["arrow", "line", "focus", "swap"]);
-const FIT_COLS = 16;
-const FIT_ROWS = 32;
+const MAX_RESCORES = 3;
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -36,302 +62,405 @@ function json(status: number, body: unknown) {
   });
 }
 
-function extractJson(text: string): any | null {
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch { /* fall through */ }
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenced) {
-    try { return JSON.parse(fenced[1]); } catch { /* noop */ }
+function buildV4(
+  intake: Intake,
+  engine: ReturnType<typeof runEngine>,
+  judge: JudgeInput,
+  locale: string,
+  swapsV2: SwapV2[],
+  pieces: ReturnType<typeof sanitizePieces>,
+  palette: string[],
+  rescoresRemaining: number,
+) {
+  const codeMarkers = dressCodeMarkers(intake, judge.signals);
+  return {
+    headline: {
+      value: engine.headline,
+      weighted_mean: engine.weighted_mean,
+      band: engine.band,
+      reason: engine.reason,
+    },
+    rubric: {
+      id: rubricId(intake),
+      version: RUBRIC_VERSION,
+      occasion: intake.occasion,
+      role: intake.role,
+      venue: intake.venue,
+      room: intake.room,
+      on_feet: intake.on_feet,
+      formality: intake.formality,
+      formality_caption: FORMALITY_CAPTIONS[intake.occasion][intake.formality - 1],
+      presence: intake.presence,
+      presence_caption: PRESENCE_CAPTIONS[intake.presence - 1],
+      label: rubricLabel(intake),
+      brief_line: briefLine(intake, locale),
+      primary_axes: primaryAxes(intake),
+    },
+    brief_verdict: engine.brief_verdict,
+    axes: engine.axes,
+    dress_code: {
+      read: engine.ctx.read,
+      claimed: engine.ctx.claimed,
+      // The absolute rung the dial position implies. The gap is measured
+      // against this, not against the dial, so the client has to show it or the
+      // "you said X, the photo says Y" rows will not reconcile.
+      target: engine.ctx.target,
+      gap: engine.ctx.gap,
+      severity: engine.ctx.severity,
+      direction: engine.ctx.direction,
+      line: engine.ctx.line,
+      evidence: judge.formality_evidence ?? "",
+      markers: codeMarkers,
+      /** Rendered only where the brief actually carries a code. */
+      render: intake.occasion === "wedding" || (intake.occasion === "work" && intake.formality >= 4) || Math.abs(engine.ctx.gap) >= 1,
+    },
+    presence_check: {
+      ...engine.presence,
+      evidence: judge.presence_evidence ?? "",
+      render: Math.abs(engine.presence.gap) >= 1,
+      mechanism: mechanismLine(engine),
+    },
+    score_breakdown: {
+      weights_source: rubricId(intake),
+      null_axes: engine.null_axes,
+      discarded_axes: engine.discarded_axes,
+      weight_deltas: engine.weight_deltas,
+      raw_weighted: engine.raw_weighted,
+      rules_fired: engine.rules_fired,
+      caps_applied: engine.caps_applied,
+      downgraded_to_caveat: engine.downgraded_to_caveat,
+      final: engine.headline,
+    },
+    why_this_number: engine.why_this_number,
+    lever: engine.lever
+      ? {
+        ...engine.lever,
+        action: swapsV2.find((s) => s.axis === engine.lever!.axis)?.to ??
+          swapsV2[0]?.to ?? `Lift ${engine.lever.label.toLowerCase()}.`,
+      }
+      : null,
+    caveats: engine.caveats,
+    intake_echo: intakeEcho(intake, engine),
+    pieces,
+    swaps_v2: swapsV2,
+    signals: judge.signals,
+    palette_hex: palette,
+    intent: intake.intent,
+    intent_axis: engine.intent_axis,
+    intent_note: judge.intent_note ?? null,
+    rescores_remaining: rescoresRemaining,
+    scoring_version: "v4",
+  };
+}
+
+function mechanismLine(engine: ReturnType<typeof runEngine>): string {
+  if (engine.presence.gap === 0) return "";
+  const axis: AxisKey = engine.presence.gap > 0 ? "COL" : "POV";
+  const row = engine.axes.find((a) => a.key === axis);
+  if (!row) return "";
+  return `${row.label} carries ${Math.round(row.weight * 100)}% of this score at that setting.`;
+}
+
+/** The dress-code checklist. Only the markers that the brief actually requires
+ * are listed, and a marker the photograph could not show is `null`, never a
+ * cross. */
+function dressCodeMarkers(intake: Intake, signals: SignalMap): Array<{ name: string; required: boolean; present: boolean | null; note?: string }> {
+  const out: Array<{ name: string; required: boolean; present: boolean | null; note?: string }> = [];
+  const val = (k: string) => signals[k]?.value?.toLowerCase().trim() ?? "";
+  const has = (k: string) => ["true", "yes", "1"].includes(val(k));
+  const feetVisible = has("feet_visible");
+
+  if (intake.occasion === "wedding" && intake.formality === 5) {
+    const markers = val("black_tie_markers");
+    const errors = val("bt_code_errors");
+    out.push({ name: "A faced lapel, or a floor-length hem", required: true, present: markers === "full" ? true : markers === "partial" ? null : false });
+    out.push({ name: "A bow tie, not a long tie", required: true, present: errors.includes("long_necktie") ? false : markers === "full" ? true : null });
+    out.push({ name: "Black formal footwear", required: true, present: feetVisible ? !errors.includes("brown_shoe") && !errors.includes("derby") : null, note: feetVisible ? undefined : "Feet out of frame." });
   }
-  const first = text.indexOf("{");
-  const last = text.lastIndexOf("}");
-  if (first >= 0 && last > first) {
-    const slice = text.slice(first, last + 1);
-    try { return JSON.parse(slice); } catch { /* noop */ }
+  if (intake.occasion === "wedding" && intake.formality === 4) {
+    out.push({ name: "Cocktail length, not floor length", required: true, present: val("hem_length") === "floor" ? false : val("hem_length") ? true : null });
+    out.push({ name: "No denim", required: true, present: !has("denim_present") });
   }
-  return null;
-}
-
-function clamp01(n: unknown, fallback = 0.5): number {
-  const v = Number(n);
-  if (!isFinite(v)) return fallback;
-  return Math.max(0, Math.min(1, v));
-}
-
-function clampRange(n: unknown, lo: number, hi: number, fallback: number): number {
-  const v = Number(n);
-  if (!isFinite(v)) return fallback;
-  return Math.max(lo, Math.min(hi, v));
-}
-
-function normalizePoint(p: any): [number, number] | null {
-  if (!p) return null;
-  if (Array.isArray(p) && p.length >= 2) return [clamp01(p[0]), clamp01(p[1])];
-  if (typeof p === "object" && "x" in p && "y" in p) return [clamp01(p.x), clamp01(p.y)];
-  return null;
-}
-
-function sanitizeMarkupAnnotations(raw: any): any[] {
-  if (!Array.isArray(raw)) return [];
-  const out: any[] = [];
-  for (const a of raw.slice(0, 6)) {
-    const type = String(a?.type ?? "").toLowerCase().trim();
-    if (!MARKUP_TYPES.has(type)) continue;
-    const note = String(a?.note ?? "").slice(0, 200);
-    const confidence = clamp01(a?.confidence, 0.7);
-    const coordsRaw = a?.coords ?? {};
-    const coords: any = {};
-    if (type === "arrow" || type === "line") {
-      const from = normalizePoint(coordsRaw.from);
-      const to = normalizePoint(coordsRaw.to);
-      if (!from || !to) continue;
-      coords.from = from;
-      coords.to = to;
-    } else if (type === "focus") {
-      const at = normalizePoint(coordsRaw.at);
-      if (!at) continue;
-      coords.at = at;
-      coords.radius = clamp01(coordsRaw.radius, 0.08);
-    } else if (type === "swap") {
-      const at = normalizePoint(coordsRaw.at);
-      if (!at) continue;
-      coords.at = at;
-    }
-    out.push({ type, coords, note, confidence });
+  if (intake.occasion === "wedding" && intake.role !== "couple") {
+    const white = val("white_coverage");
+    out.push({ name: "Not white", required: true, present: white === "dominant" ? false : white ? true : null });
+  }
+  if (intake.occasion === "wedding" && intake.venue === "registry_or_worship") {
+    out.push({ name: "Shoulders covered", required: true, present: signals["shoulder_coverage"] ? has("shoulder_coverage") : null });
+  }
+  if (intake.occasion === "work" && (intake.room === "corporate" || intake.room === "client_facing" || intake.formality >= 4)) {
+    out.push({ name: "No denim", required: true, present: !has("denim_present") });
+    out.push({ name: "No athletic shoes", required: true, present: feetVisible ? !has("athletic_sneakers") : null, note: feetVisible ? undefined : "Feet out of frame." });
+    out.push({ name: "Nothing distressed or slogan-printed", required: true, present: !has("distressing") && !has("graphic_or_slogan") });
   }
   return out;
 }
 
-function sanitizeFitMap(raw: any): any | null {
-  if (!raw || typeof raw !== "object") return null;
-  const gridIn = raw.grid;
-  if (!Array.isArray(gridIn)) return null;
-
-  // Coerce to FIT_ROWS x FIT_COLS. Accept smaller/larger and resample naively.
-  const rowsIn = gridIn.length;
-  const grid: number[][] = [];
-  for (let r = 0; r < FIT_ROWS; r++) {
-    const srcR = Math.min(rowsIn - 1, Math.floor((r / FIT_ROWS) * rowsIn));
-    const srcRow = Array.isArray(gridIn[srcR]) ? gridIn[srcR] : [];
-    const row: number[] = [];
-    const colsIn = srcRow.length || 1;
-    for (let c = 0; c < FIT_COLS; c++) {
-      const srcC = Math.min(colsIn - 1, Math.floor((c / FIT_COLS) * colsIn));
-      row.push(clampRange(srcRow[srcC], -1, 1, 0));
-    }
-    grid.push(row);
+/** "You picked X → here is what X did." The section that exists so a user can
+ * never say the app ignored their answer. */
+function intakeEcho(intake: Intake, engine: ReturnType<typeof runEngine>) {
+  const pct = (a: AxisKey) => `${Math.round((engine.weights[a] ?? 0) * 100)}%`;
+  const top = engine.axes[0];
+  const out: Array<{ label: string; effect: string }> = [];
+  out.push({
+    label: intake.occasion.charAt(0).toUpperCase() + intake.occasion.slice(1),
+    effect: `${top.label} became the heaviest axis at ${pct(top.key)}`,
+  });
+  out.push({
+    label: `${FORMALITY_CAPTIONS[intake.occasion][intake.formality - 1]} ${"●".repeat(intake.formality)}${"○".repeat(5 - intake.formality)}`,
+    effect: `Dress code weighted ${pct("CTX")}`,
+  });
+  out.push({
+    label: `${PRESENCE_CAPTIONS[intake.presence - 1]} ${"●".repeat(intake.presence)}${"○".repeat(5 - intake.presence)}`,
+    effect: engine.presence.gap === 0
+      ? "Matched — point of view credited"
+      : `Point of view weighted ${pct("POV")}`,
+  });
+  if (intake.role) out.push({ label: intake.role.replace(/_/g, " "), effect: intake.role === "couple" ? "The white rule does not apply to you" : "Armed the white rule" });
+  if (intake.venue) out.push({ label: intake.venue.replace(/_/g, " "), effect: `Footwear weighted ${pct("SHO")}` });
+  if (intake.room) out.push({ label: intake.room.replace(/_/g, " "), effect: `Dress code weighted ${pct("CTX")}` });
+  if (intake.on_feet) out.push({ label: intake.on_feet.replace(/_/g, " "), effect: `Footwear weighted ${pct("SHO")}` });
+  if (intake.weather) out.push({ label: intake.weather.band, effect: `Fabric weighted ${pct("TEX")}` });
+  out.push({ label: intake.time_of_day, effect: intake.time_of_day === "evening" ? "Evening fabrics rewarded" : "Daylight fabrics expected" });
+  if (intake.intent && engine.intent_axis) {
+    out.push({ label: `"${intake.intent}"`, effect: `${AXIS_LABELS[engine.intent_axis]} weighted up` });
   }
-
-  const hotspotsIn: any[] = Array.isArray(raw.hotspots) ? raw.hotspots : [];
-  const hotspots = hotspotsIn.slice(0, 3).map((h: any) => {
-    const at = normalizePoint(h?.at) ?? [0.5, 0.5];
-    const label = String(h?.label ?? "").slice(0, 80);
-    const severity = clampRange(h?.severity, -1, 1, 0);
-    return { at, label, severity };
-  }).filter((h: any) => h.label.length > 0);
-
-  return {
-    resolution: [FIT_COLS, FIT_ROWS],
-    grid,
-    hotspots,
-  };
+  out.push({
+    label: intake.has_back ? "Front and back" : "Front only",
+    effect: intake.has_back ? "Full fit read" : "Fit ceilinged at 8.5",
+  });
+  return out;
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: CORS });
-  }
+// ── /rescore ───────────────────────────────────────────────────────────────
 
-  const auth = req.headers.get("Authorization") ?? "";
-  if (!auth.toLowerCase().startsWith("bearer ")) {
-    return json(401, { error: "unauthorized" });
-  }
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-  const FAL_KEY = Deno.env.get("FAL_KEY");
-  if (!FAL_KEY) {
-    return json(500, { error: "server_misconfigured" });
-  }
+async function userIdFromJwt(jwt: string): Promise<string | null> {
+  if (!SUPABASE_URL || !SERVICE_KEY) return null;
+  const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { Authorization: `Bearer ${jwt}`, apikey: SERVICE_KEY },
+  });
+  if (!r.ok) return null;
+  const j = await r.json();
+  return typeof j?.id === "string" ? j.id : null;
+}
+
+async function rest(path: string, init: RequestInit = {}) {
+  return await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...init,
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      "content-type": "application/json",
+      ...(init.headers ?? {}),
+    },
+  });
+}
+
+/**
+ * Re-run the engine against the stored witness with a corrected brief. No model
+ * call, so it is free and sub-second — which is the whole point: rather than
+ * interrogating the user up front, assume, then let them fix the assumption in
+ * one tap and watch the number move.
+ *
+ * The outfit is loaded scoped to the caller's own user_id. That scoping is the
+ * only thing standing between this route and a full-table read, because this is
+ * the first time the function holds the service role key.
+ */
+async function handleRescore(req: Request, jwt: string): Promise<Response> {
+  const uid = await userIdFromJwt(jwt);
+  if (!uid) return json(401, { error: "unauthorized" });
 
   let body: any = {};
-  try {
-    body = await req.json();
-  } catch { /* noop */ }
+  try { body = await req.json(); } catch { /* noop */ }
+  const outfitId = String(body?.outfit_id ?? "").trim();
+  if (!outfitId) return json(400, { error: "missing_outfit_id" });
 
-  const image_url = (body?.image_url ?? "").toString().trim();
-  const back_url = (body?.back_url ?? "").toString().trim();
-  const occasion = (body?.occasion ?? "everyday").toString().trim() || "everyday";
-  const honesty = resolveHonesty(body?.honesty);
-  const intent = (body?.intent ?? "").toString().trim().slice(0, 300);
-  const bodyProfile = body?.body_profile && typeof body.body_profile === "object"
-    ? body.body_profile
-    : null;
+  const r = await rest(
+    `outfits?id=eq.${encodeURIComponent(outfitId)}&user_id=eq.${encodeURIComponent(uid)}&select=id,raw_axes,signals,rescore_count,score,score_breakdown,photo_path,back_photo_path`,
+  );
+  if (!r.ok) return json(502, { error: "load_failed", detail: (await r.text()).slice(0, 200) });
+  const rows = await r.json();
+  if (!Array.isArray(rows) || rows.length === 0) return json(404, { error: "not_found" });
+  const row = rows[0];
 
-  if (!image_url) {
-    return json(400, { error: "missing_image_url" });
+  const used = Number(row.rescore_count ?? 0);
+  if (used >= MAX_RESCORES) return json(429, { error: "rescore_limit", limit: MAX_RESCORES });
+
+  const witness = row.raw_axes;
+  if (!witness || typeof witness !== "object" || !witness.axes) {
+    return json(409, { error: "no_witness", detail: "This look was scored before the engine kept its working." });
   }
 
-  const systemPrompt = [
-    "You are Hem — an editorial fashion critic for a monthly print magazine.",
-    "Voice: terse, sharp, image-first. Never chatty. No emoji. No hedging.",
-    "Your comments read like a one-sentence pull-quote in a style feature: concrete nouns, specific fabrics, cuts, colors, silhouette. Never advice-column.",
-    HONESTY_LINES[honesty],
-    "Scoring calibration (IMPORTANT — do NOT be a harsh grader):",
-    "10 = magazine cover material; 9 = editorial-ready; 8 = confident and considered; 7 = solid everyday look with one weak note; 6 = works but forgettable; 5 = a fixable miss; 4 = wrong pieces together; 3 = mismatch of context; 2 = careless; 1 = essentially unstyled.",
-    "Most real casual looks land 6–8. Reserve 3 and below for genuine disasters — never punish an honest daytime outfit into the 2s just because it isn't formal.",
-    "Weigh CONTEXT: if occasion is 'everyday' or 'casual', a t-shirt and shorts is a 7 unless the fit or color choice fails. Do not conflate 'not fancy' with 'bad'.",
-    "Annotation scores follow the same scale — individual pieces should mostly land 5–9 for real garments; only give 1–3 to genuinely broken items.",
-    "The overall score should roughly equal the average of your annotation scores, weighted toward the largest visible garments.",
-    "Every piece-annotation MUST include a 'note' — ONE concrete, actionable fix in 60 characters or fewer, phrased like a stylist's margin scribble.",
-    "Output MUST be strict JSON matching the requested schema. No prose outside the JSON. No markdown fences.",
-  ].join(" ");
-
-  // Extended prompt sections
-  const markupInstruction =
-    `"markup_annotations": [{"type":"arrow"|"line"|"focus"|"swap", "coords": <shape below>, "note": string (8-12 words, editorial voice), "confidence": number 0-1}]. ` +
-    `Add annotation markup for the eye path, proportion breaks, best detail worth defending, and highest-ROI swap. ` +
-    `Coords are normalized [0,1] with origin top-left. ` +
-    `arrow/line coords: {"from":[x,y], "to":[x,y]}. focus coords: {"at":[x,y], "radius": number 0-1}. swap coords: {"at":[x,y]}. ` +
-    `Keep captions editorial, 8-12 words. Between 3 and 6 items.`;
-
-  const fitMapInstruction =
-    `"fit_map": {"resolution":[${FIT_COLS},${FIT_ROWS}], "grid": number[${FIT_ROWS}][${FIT_COLS}] each in [-1,1], "hotspots":[{"at":[x,y],"label":string,"severity":number [-1,1]}]}. ` +
-    `Add fit_map — approximate garment tension across a ${FIT_COLS}x${FIT_ROWS} grid (${FIT_COLS} cols by ${FIT_ROWS} rows). ` +
-    `-1 = pooling/loose, +1 = tight/pulling, 0 = neutral. ` +
-    `Fill the grid row-by-row top to bottom over the whole frame. Add 1-3 hotspots with human-readable labels (e.g. "waistband pulls", "hem pools at ankle").`;
-
-  const bodyProfileInstruction = bodyProfile
-    ? `The user's baseline: ${String(bodyProfile.body_shape ?? "unknown")}, ${String(bodyProfile.coloring_season ?? "unknown")}, palette ${JSON.stringify(bodyProfile.palette_hex ?? [])}. ` +
-      `Add a "fits_you" number 0-10 for how well this outfit works with THEIR proportions and coloring specifically.`
-    : "";
-
-  const intentInstruction = intent
-    ? `The user's stated intent for this look: '${intent.replace(/'/g, "\\'")}'. Weight the critique against the intent. If they hit it, score higher. If contradiction, name the mismatch in hem_comment.`
-    : "";
-
-  const backInstruction = back_url
-    ? `A second photo is the back view (see additional image). Rate both views together; note back-specific issues (belt sit, jacket vent, trouser drape) in hem_comment or annotations.`
-    : "";
-
-  const userPrompt =
-    `Score this outfit for a ${occasion} occasion out of 10 (one decimal). ` +
-    `Return strict JSON with this exact shape: ` +
-    `{"score": number, ` +
-    `"subscores": {"color": number, "fit": number, "style_match": number, "seasonal": number}, ` +
-    `"hem_comment": string (max 140 chars, one sentence, editorial voice), ` +
-    `"swaps": ["...", "..."] (max 2 swap suggestions), ` +
-    `"annotations": [{"x_pct": number, "y_pct": number, "label": string, "score": number, "note": string}], ` +
-    `${markupInstruction}, ` +
-    `${fitMapInstruction}` +
-    (bodyProfile ? `, "fits_you": number 0-10` : "") +
-    `}. ` +
-    `The annotations array MUST have between 3 and 6 items. Each annotation pins a critique to a garment area on the image: ` +
-    `x_pct and y_pct are normalized image coordinates from 0 to 100 (top-left origin). ` +
-    `label is a short lowercase token like "top", "trousers", "shoes". ` +
-    `score is 0..10 for that specific piece/detail. ` +
-    `note is ONE concrete fix, max 60 characters. ` +
-    (bodyProfileInstruction ? bodyProfileInstruction + " " : "") +
-    (intentInstruction ? intentInstruction + " " : "") +
-    (backInstruction ? backInstruction + " " : "") +
-    `Return ONLY JSON, no prose, no code fences.`;
-
-  const falBody: any = {
-    model: "google/gemini-pro-1.5",
-    prompt: userPrompt,
-    image_url,
-    system_prompt: systemPrompt,
-  };
-  if (back_url) {
-    // Fal any-llm/vision accepts an array of image_urls on multi-image models.
-    falBody.image_urls = [image_url, back_url];
-  }
-
-  const falResp = await fetch("https://fal.run/fal-ai/any-llm/vision", {
-    method: "POST",
-    headers: {
-      Authorization: `Key ${FAL_KEY}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(falBody),
+  const parsed = parseRequest({
+    ...body,
+    image_url: "rescore",
+    back_url: witness.has_back ? "rescore-back" : "",
   });
+  const judge = normalizeJudge(witness, sanitizePalette(witness.palette_hex));
+  judge.signals = { ...toSignalMap({ signals: row.signals }), ...judge.signals };
+  const engine = runEngine(parsed.intake, judge);
 
-  const rawText = await falResp.text();
-  if (!falResp.ok) {
-    return json(502, { error: "fal_error", status: falResp.status, detail: rawText.slice(0, 500) });
-  }
+  const history = Array.isArray(row.score_breakdown?.history) ? row.score_breakdown.history : [];
+  history.push({ from: row.score, to: engine.headline, rubric_id: rubricId(parsed.intake) });
 
-  let falJson: any = null;
-  try {
-    falJson = JSON.parse(rawText);
-  } catch {
-    return json(502, { error: "fal_bad_json", raw: rawText.slice(0, 500) });
-  }
+  const v4 = buildV4(parsed.intake, engine, judge, parsed.locale, [], [], judge.palette_hex ?? [], MAX_RESCORES - used - 1);
 
-  const modelText: string =
-    falJson?.output ??
-    falJson?.text ??
-    falJson?.response ??
-    (typeof falJson === "string" ? falJson : "");
-
-  const parsed = extractJson(modelText);
-  if (!parsed || typeof parsed !== "object") {
-    return json(502, { error: "parse_failed", raw: modelText.slice(0, 800) });
-  }
-
-  const score = Number(parsed.score);
-  const sub = parsed.subscores ?? {};
-  const subscores = {
-    color: Number(sub.color) || 0,
-    fit: Number(sub.fit) || 0,
-    style_match: Number(sub.style_match ?? sub.styleMatch) || 0,
-    seasonal: Number(sub.seasonal) || 0,
+  const patch = {
+    // The row's own headline moves, but the Journal graphs the FIRST score —
+    // a repair tap is for correcting a wrong answer, not for shopping.
+    score: engine.headline,
+    subscores: engine.subscores,
+    intake: parsed.intake,
+    rubric_id: rubricId(parsed.intake),
+    axes: engine.axes,
+    score_breakdown: { ...v4.score_breakdown, history },
+    dress_code: v4.dress_code,
+    presence_check: v4.presence_check,
+    lever: v4.lever,
+    caveats: engine.caveats,
+    rescore_count: used + 1,
+    scoring_version: "v4",
   };
-  const hem_comment = String(parsed.hem_comment ?? "").slice(0, 200);
-  const swaps: string[] = Array.isArray(parsed.swaps)
-    ? parsed.swaps.slice(0, 2).map((s: unknown) => String(s))
-    : [];
+  const up = await rest(`outfits?id=eq.${encodeURIComponent(outfitId)}&user_id=eq.${encodeURIComponent(uid)}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+  if (!up.ok) return json(502, { error: "save_failed", detail: (await up.text()).slice(0, 200) });
 
-  const annotations: Array<{ x_pct: number; y_pct: number; label: string; score: number; note: string }> =
-    Array.isArray(parsed.annotations)
-      ? parsed.annotations
-          .slice(0, 6)
-          .map((a: any) => ({
-            x_pct: Math.max(0, Math.min(100, Number(a?.x_pct) || 50)),
-            y_pct: Math.max(0, Math.min(100, Number(a?.y_pct) || 50)),
-            label: String(a?.label ?? "").slice(0, 24),
-            score: Math.max(0, Math.min(10, Number(a?.score) || 0)),
-            note: String(a?.note ?? "").slice(0, 60),
-          }))
-          .filter((a: any) => a.label.length > 0)
-      : [];
+  return json(200, {
+    score: engine.headline,
+    subscores: engine.subscores,
+    previous_score: row.score,
+    ...v4,
+    score_breakdown: { ...v4.score_breakdown, history },
+  });
+}
 
-  const markupAnnotations = sanitizeMarkupAnnotations(parsed.markup_annotations ?? parsed.markupAnnotations);
-  const fitMap = sanitizeFitMap(parsed.fit_map ?? parsed.fitMap);
+// ── entry ──────────────────────────────────────────────────────────────────
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+
+  const auth = req.headers.get("Authorization") ?? "";
+  if (!auth.toLowerCase().startsWith("bearer ")) return json(401, { error: "unauthorized" });
+  const jwt = auth.slice(7).trim();
+
+  const url = new URL(req.url);
+  if (url.pathname.endsWith("/rescore")) return await handleRescore(req, jwt);
+
+  if (!hasModelKey()) return json(500, { error: "server_misconfigured" });
+
+  let body: any = {};
+  try { body = await req.json(); } catch { /* noop */ }
+
+  const parsed = parseRequest(body);
+  if (!parsed.imageUrl) return json(400, { error: "missing_image_url" });
+
+  const images = parsed.backUrl ? [parsed.imageUrl, parsed.backUrl] : [parsed.imageUrl];
+
+  // Two calls in parallel. The score renders off JUDGE alone, so a truncated
+  // drawing response costs an x-ray, not a read.
+  const judgeCall = call({
+    system: JUDGE_SYSTEM,
+    prompt: [
+      judgePrompt(parsed.intake, parsed.intake.has_back),
+      "",
+      SIGNALS_LIST_INSTRUCTION,
+      "",
+      RESPONSE_SHAPE,
+    ].join("\n"),
+    imageUrls: images,
+    schema: judgeSchema(),
+    temperature: 0.4,
+  });
+  const drawCall = parsed.wantsXray
+    ? call({ prompt: DRAW_PROMPT, imageUrls: [parsed.imageUrl], temperature: 0.5 })
+    : Promise.reject(new Error("skipped"));
+
+  const [judgeSettled, drawSettled] = await Promise.allSettled([judgeCall, drawCall]);
+
+  if (judgeSettled.status === "rejected") {
+    return json(502, { error: "model_failed", detail: String(judgeSettled.reason).slice(0, 400) });
+  }
+  const judgeRaw = judgeSettled.value.json;
+  const draw = drawSettled.status === "fulfilled" ? drawSettled.value.json : null;
+
+  const palette = sanitizePalette(draw?.palette_hex ?? judgeRaw?.palette_hex);
+  const judge = normalizeJudge(judgeRaw, palette);
+  if (Object.keys(judge.axes).length === 0) {
+    // Include what the model actually said when asked — a bare "parse_failed"
+    // gives no way to tell a truncated response from a wrong-shaped one.
+    return json(502, {
+      error: "parse_failed",
+      detail: "no axes returned",
+      transport: judgeSettled.value.transport,
+      ...(url.searchParams.get("debug") === "1"
+        ? { raw: JSON.stringify(judgeRaw).slice(0, 1500) }
+        : {}),
+    });
+  }
+
+  const engine = runEngine(parsed.intake, judge);
+  const swapsV2 = normalizeSwaps(judgeRaw?.swaps);
+  const pieces = sanitizePieces(draw?.pieces);
+  const markup = sanitizeMarkupAnnotations(draw?.markup_annotations);
+  const fitMap = sanitizeFitMap(draw?.fit_map);
 
   let fitsYou: number | null = null;
-  if (bodyProfile) {
-    const fy = Number(parsed.fits_you ?? parsed.fitsYou);
-    if (isFinite(fy)) fitsYou = Math.max(0, Math.min(10, fy));
-  }
-
-  if (!isFinite(score)) {
-    return json(502, { error: "parse_failed", raw: modelText.slice(0, 800) });
+  if (parsed.bodyProfile) {
+    // Personalised fit is not a second opinion on the same photograph — it is
+    // the engine's own fit and silhouette read, weighted the way this body
+    // profile weights them. Making it up from a separate model number is how
+    // "Fits you" ended up on screen without ever touching the score.
+    const fit = engine.axes.find((a) => a.key === "FIT")?.score;
+    const sil = engine.axes.find((a) => a.key === "SIL")?.score;
+    const vals = [fit, sil].filter((v): v is number => v != null);
+    if (vals.length > 0) fitsYou = Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 10) / 10;
   }
 
   const out: Record<string, unknown> = {
-    score,
-    subscores,
-    hem_comment,
-    swaps,
-    annotations,
-    version: "v3",
-    raw_model_response: modelText,
+    // ── v3 envelope. Never remove, never change type. ──────────────────────
+    score: engine.headline,
+    subscores: engine.subscores,
+    hem_comment: String(judgeRaw?.hem_comment ?? "").slice(0, 200),
+    swaps: legacySwaps(swapsV2),
+    annotations: legacyAnnotations(pieces, engine.lever?.label ?? null, swapsV2[0]),
+    version: "v4",
   };
-  // New fields — omit rather than null so old clients don't see unexpected keys unnecessarily.
-  if (markupAnnotations.length > 0) out.markup_annotations = markupAnnotations;
+  if (markup.length > 0) out.markup_annotations = markup;
   if (fitMap) out.fit_map = fitMap;
   if (fitsYou !== null) out.fits_you = fitsYou;
+
+  if (parsed.wantsV4Envelope) {
+    Object.assign(out, buildV4(
+      parsed.intake, engine, judge, parsed.locale, swapsV2, pieces, palette, MAX_RESCORES,
+    ));
+    out.verdict = String(judgeRaw?.verdict ?? "").slice(0, 600);
+    out.intake_warnings = parsed.warnings;
+    // Stored so /rescore can replay the whole pipeline with no model call.
+    out.raw_axes = {
+      axes: judgeRaw?.axes ?? {},
+      formality_read: judge.formality_read,
+      formality_evidence: judge.formality_evidence,
+      presence_read: judge.presence_read,
+      presence_evidence: judge.presence_evidence,
+      interp: judge.interp,
+      intent_axis: judge.intent_axis,
+      intent_met: judge.intent_met,
+      intent_note: judge.intent_note,
+      caveats: judge.caveats,
+      palette_hex: palette,
+      has_back: parsed.intake.has_back,
+    };
+    out.transport = judgeSettled.value.transport;
+  }
+
+  if (url.searchParams.get("debug") === "1") {
+    out.debug = { judge: judgeRaw, draw, intake: parsed.intake };
+  }
 
   return json(200, out);
 });

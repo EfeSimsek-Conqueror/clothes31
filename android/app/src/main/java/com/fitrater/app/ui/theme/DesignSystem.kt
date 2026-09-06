@@ -1,6 +1,20 @@
 package com.fitrater.app.ui.theme
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +32,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +47,8 @@ import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fitrater.app.R
@@ -148,10 +165,16 @@ object HemType {
 }
 
 @Composable
-fun Eyebrow(text: String, modifier: Modifier = Modifier, muted: Boolean = false) {
+fun Eyebrow(
+    text: String,
+    modifier: Modifier = Modifier,
+    muted: Boolean = false,
+    size: TextUnit = 11.sp,
+) {
+    val base = if (muted) HemType.eyebrowMuted else HemType.eyebrow
     Text(
         text = text.uppercase(),
-        style = if (muted) HemType.eyebrowMuted else HemType.eyebrow,
+        style = base.copy(fontSize = size, letterSpacing = 2.sp),
         modifier = modifier,
     )
 }
@@ -202,13 +225,15 @@ fun PrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     leadingGlyph: String? = null,
+    height: Dp = 56.dp,
+    corner: Dp = 4.dp,
 ) {
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp)
-            .clip(RoundedCornerShape(4.dp))
+            .height(height)
+            .clip(RoundedCornerShape(corner))
             .background(if (enabled) HemColors.Ink else HemColors.Muted)
             .clickable(enabled = enabled) {
                 haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
@@ -221,7 +246,13 @@ fun PrimaryButton(
             Text(leadingGlyph, style = HemType.label)
             Spacer(Modifier.width(8.dp))
         }
-        Text(label.uppercase(), style = HemType.label)
+        Text(
+            label.uppercase(),
+            style = HemType.label,
+            maxLines = 2,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
     }
 }
 
@@ -342,3 +373,230 @@ fun EyebrowRow(text: String, trailing: String? = null) {
 
 /** Fills a modifier's default paddings for screen bodies. */
 val ScreenPadding: PaddingValues = PaddingValues(horizontal = 24.dp, vertical = 16.dp)
+
+// ---------------------------------------------------------------------------
+// Try-on / editorial primitives. Mirrors of the Swift components added to
+// DesignSystem.swift in the same change — keep the two files in lockstep.
+// ---------------------------------------------------------------------------
+
+enum class ProBadgeStyle { Filled, TextOnly }
+
+/**
+ * The "PRO" mark. [ProBadgeStyle.Filled] is the bronze chip that sits beside an
+ * eyebrow; [ProBadgeStyle.TextOnly] is the tracked bronze word used inline in a
+ * row where a filled chip would shout.
+ */
+@Composable
+fun ProBadge(
+    style: ProBadgeStyle = ProBadgeStyle.Filled,
+    modifier: Modifier = Modifier,
+) {
+    when (style) {
+        ProBadgeStyle.Filled -> Box(
+            modifier
+                .clip(RoundedCornerShape(3.dp))
+                .background(HemColors.Bronze)
+                .padding(horizontal = 6.dp, vertical = 3.dp),
+        ) {
+            Text(
+                "PRO",
+                style = TextStyle(
+                    fontFamily = SansFamily,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.2.sp,
+                    color = Color.White,
+                ),
+            )
+        }
+        ProBadgeStyle.TextOnly -> Text(
+            "PRO",
+            modifier = modifier,
+            style = TextStyle(
+                fontFamily = SansFamily,
+                fontSize = 9.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.5.sp,
+                color = HemColors.Bronze,
+            ),
+        )
+    }
+}
+
+/** The soft tan circular chip with an "x" that closes a full-screen editorial flow. */
+@Composable
+fun CircleCloseButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentDescription: String = "Close",
+) {
+    Box(
+        modifier.size(44.dp).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(HemColors.CardCream)
+                .border(1.dp, HemColors.Hairline, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = contentDescription,
+                tint = HemColors.Ink,
+                modifier = Modifier.size(12.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Tan card with a hairline border that is dashed while the slot is empty and
+ * solid once it is filled. The stroke is inset by half its width so the clip
+ * does not eat half the hairline.
+ */
+@Composable
+fun DashedBox(
+    modifier: Modifier = Modifier,
+    corner: Dp = 14.dp,
+    dashed: Boolean = true,
+    background: Color = HemColors.CardCream,
+    contentAlignment: Alignment = Alignment.Center,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(corner))
+            .background(background)
+            .drawBehind {
+                val sw = 1.dp.toPx()
+                drawRoundRect(
+                    color = HemColors.Hairline,
+                    topLeft = Offset(sw / 2f, sw / 2f),
+                    size = Size(size.width - sw, size.height - sw),
+                    cornerRadius = CornerRadius(corner.toPx()),
+                    style = Stroke(
+                        width = sw,
+                        pathEffect = if (dashed) PathEffect.dashPathEffect(floatArrayOf(5f, 4f)) else null,
+                    ),
+                )
+            },
+        contentAlignment = contentAlignment,
+        content = content,
+    )
+}
+
+/**
+ * Content-width segmented control: an ink pill slides between the options on a
+ * tan track. [options] is a list of key-to-label pairs; [selection] is a key.
+ */
+@Composable
+fun SegmentedPill(
+    options: List<Pair<String, String>>,
+    selection: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(HemColors.CardCream)
+            .border(1.dp, HemColors.Hairline, RoundedCornerShape(999.dp))
+            .padding(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        options.forEach { (key, label) ->
+            val active = key == selection
+            val bg by animateColorAsState(
+                targetValue = if (active) HemColors.Ink else Color.Transparent,
+                label = "segmentBg",
+            )
+            val fg by animateColorAsState(
+                targetValue = if (active) Color.White else HemColors.Ink,
+                label = "segmentFg",
+            )
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(bg)
+                    .clickable { onSelect(key) }
+                    .padding(horizontal = 14.dp, vertical = 7.dp),
+            ) {
+                Text(
+                    label,
+                    style = HemType.body.copy(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = fg,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Caption burned into the bottom of an image: a soft dark scrim carrying a
+ * tracked small-caps [leading] label on the left and an optional serif-italic
+ * [trailingItalic] word on the right. Call inside a Box that has a real height.
+ */
+@Composable
+fun BoxScope.BurnedCaption(
+    leading: String,
+    trailingItalic: String? = null,
+    modifier: Modifier = Modifier,
+    inset: Dp = 14.dp,
+    leadingSize: TextUnit = 10.sp,
+) {
+    Box(
+        modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .fillMaxHeight(0.36f)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color.Transparent,
+                        Color.Black.copy(alpha = 0.10f),
+                        Color.Black.copy(alpha = 0.55f),
+                    ),
+                ),
+            ),
+    ) {
+        Row(
+            Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(inset),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                leading.uppercase(),
+                style = TextStyle(
+                    fontFamily = SansFamily,
+                    fontSize = leadingSize,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.8.sp,
+                    color = Color.White,
+                ),
+                maxLines = 2,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            if (trailingItalic != null) {
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    trailingItalic,
+                    style = TextStyle(
+                        fontFamily = SerifFamily,
+                        fontStyle = FontStyle.Italic,
+                        fontSize = 15.sp,
+                        color = Color.White.copy(alpha = 0.92f),
+                    ),
+                )
+            }
+        }
+    }
+}

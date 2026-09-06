@@ -111,7 +111,7 @@ private fun NotProContent(onOpenPlans: () -> Unit) {
         "i.  Unlimited scoring",
         "ii.  Studio without cap",
         "iii.  Try-on priority",
-        "iv.  Brutal mode always",
+        "iv.  Unlimited try-on",
         "v.  Monthly Sunday letters",
         "vi.  Full Hem memory",
     )
