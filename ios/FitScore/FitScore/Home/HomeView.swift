@@ -294,13 +294,11 @@ struct HomeView: View {
         let recents = (try? await Repo.shared.outfits(limit: 5)) ?? []
         recentOutfits = recents
 
+        // One signing request for the whole rail rather than one per card.
+        let signed = await Repo.shared.signedOutfitUrls(recents.compactMap(\.photo_path))
         var urls: [String: String] = [:]
         for o in recents {
-            if let id = o.id, let path = o.photo_path {
-                if let signed = try? await Repo.shared.signedOutfitUrl(path) {
-                    urls[id] = signed
-                }
-            }
+            if let id = o.id, let path = o.photo_path, let u = signed[path] { urls[id] = u }
         }
         recentUrls = urls
         lastVersus = try? await Repo.shared.latestVersus()

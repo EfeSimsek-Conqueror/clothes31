@@ -118,6 +118,11 @@ struct TryOnView: View {
     /// again on the way back. Watching the closet is what makes a piece appear
     /// in the strip the moment it exists.
     @ObservedObject private var closet = ClosetBus.shared
+
+    /// Signed garment URLs keyed by storage path, filled in one batch when the
+    /// strip loads. Each card used to sign its own path in `.task`, so a wide
+    /// closet opened a request per tile and the strip filled in raggedly.
+    @State private var pieceUrls: [String: String] = [:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// One-line kill switch if review pushes back on client-side page reads.
@@ -435,7 +440,8 @@ struct TryOnView: View {
                         PieceStripCard(
                             piece: p,
                             index: i,
-                            selected: pickedPiece?.id != nil && pickedPiece?.id == p.id
+                            selected: pickedPiece?.id != nil && pickedPiece?.id == p.id,
+                            resolvedUrl: p.image_path.flatMap { pieceUrls[$0] } ?? p.image_url
                         ) {
                             selectPiece(p)
                         }
@@ -918,6 +924,7 @@ struct TryOnView: View {
             let url = item.image_url?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             return !path.isEmpty || !url.isEmpty
         }
+        pieceUrls = await Repo.shared.signedClosetUrls(usable.compactMap(\.image_path))
         // A piece that arrives while the strip is on screen slides in rather
         // than appearing between frames.
         if pieces.isEmpty || reduceMotion {
@@ -1371,6 +1378,9 @@ private struct PieceStripCard: View {
     let piece: ClosetItem
     let index: Int
     let selected: Bool
+    /// Supplied by the strip's batch signing. The per-card `.task` below is now
+    /// only a fallback for a piece that arrived after the batch ran.
+    var resolvedUrl: String?
     var onTap: () -> Void
 
     @State private var url: String?
@@ -1425,6 +1435,7 @@ private struct PieceStripCard: View {
         .accessibilityLabel(name)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
         .task {
+            if let given = resolvedUrl, !given.isEmpty { url = given; return }
             if url == nil, let path = piece.image_path {
                 url = try? await Repo.shared.signedClosetUrl(path)
             }

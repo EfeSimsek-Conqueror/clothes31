@@ -3067,6 +3067,26 @@ struct OutfitWizardView: View {
                             kind: "outfit_studio"
                         ))
                         frontId = inserted.id
+
+                        // Also file the finished look in the closet. Journal
+                        // reads `outfits`, but Try On's strip reads
+                        // `closet_items`, so an outfit saved only as an outfit
+                        // row was invisible to the one screen that can actually
+                        // wear it. Category "outfit" is the whole-look path in
+                        // `tryon-outfit`, which is what a combined render is.
+                        // Only the front view is filed; the side view is a
+                        // sibling of it, not a second thing to try on.
+                        let closetPath = try await Repo.shared.uploadClosetPhoto(bytes: bytes, ext: "png")
+                        _ = try await Repo.shared.insertClosetItem(ClosetItemInsert(
+                            user_id: uid,
+                            name: label.isEmpty ? "Studio outfit" : label,
+                            category: "outfit",
+                            subcategory: nil,
+                            image_path: closetPath,
+                            color_hex: nil,
+                            parent_id: nil,
+                            source: "studio_outfit"
+                        ))
                     } catch { /* non-fatal */ }
                 }
                 if let s = sUrl {

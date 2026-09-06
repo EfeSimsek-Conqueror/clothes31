@@ -502,14 +502,19 @@ struct StudioView: View {
         // failure returning nil-coalesced [] would otherwise blank the grid.
         if let list = try? await Repo.shared.closetItems(limit: 200) {
             items = list
+            // One signing request for the whole grid. Signing per piece meant a
+            // full closet cost two hundred sequential round-trips before the
+            // last tile could draw.
+            let needsSigning = list.compactMap { it -> String? in
+                if let direct = it.image_url, !direct.isEmpty { return nil }
+                return it.image_path
+            }
+            let signed = await Repo.shared.signedClosetUrls(needsSigning)
             var urls: [String: String] = [:]
             for it in list {
                 guard let id = it.id else { continue }
                 if let direct = it.image_url, !direct.isEmpty { urls[id] = direct; continue }
-                guard let path = it.image_path else { continue }
-                if let signed = try? await Repo.shared.signedClosetUrl(path), !signed.isEmpty {
-                    urls[id] = signed
-                }
+                if let path = it.image_path, let u = signed[path], !u.isEmpty { urls[id] = u }
             }
             imageUrls = urls
         }

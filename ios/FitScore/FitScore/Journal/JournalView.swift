@@ -757,20 +757,34 @@ struct JournalView: View {
     private func load() async {
         do {
             let list = try await Repo.shared.outfits(limit: 200)
+            // Publish the entries before their photos are signed. Signing used
+            // to happen one path at a time inside this loop, so nothing at all
+            // appeared until every round-trip had finished; the cards can draw
+            // their text and dates immediately and fill in imagery after.
+            self.outfits = list
+            self.loaded = true
+
+            var wanted: [String] = []
+            // For a comparison, sign whichever frame is NOT the winner so the
+            // card can show the pair it was actually judged on.
+            var pairPath: [String: String] = [:]
+            for o in list {
+                if let p = o.photo_path, !p.isEmpty { wanted.append(p) }
+                if let id = o.id, let v = o.versusSummary {
+                    let other = v.winner == "B" ? v.aPath : v.bPath
+                    pairPath[id] = other
+                    wanted.append(other)
+                }
+            }
+            let signed = await Repo.shared.signedOutfitUrls(wanted)
+
             var urls: [String: String] = [:]
             var pairs: [String: String] = [:]
             for o in list {
-                if let id = o.id, let p = o.photo_path {
-                    urls[id] = (try? await Repo.shared.signedOutfitUrl(p)) ?? nil
-                }
-                // For a comparison, sign whichever frame is NOT the winner so the
-                // card can show the pair it was actually judged on.
-                if let id = o.id, let v = o.versusSummary {
-                    let other = v.winner == "B" ? v.aPath : v.bPath
-                    pairs[id] = (try? await Repo.shared.signedOutfitUrl(other)) ?? nil
-                }
+                guard let id = o.id else { continue }
+                if let p = o.photo_path, let u = signed[p] { urls[id] = u }
+                if let other = pairPath[id], let u = signed[other] { pairs[id] = u }
             }
-            self.outfits = list
             self.photoUrls = urls
             self.versusUrls = pairs
         } catch {

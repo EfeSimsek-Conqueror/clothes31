@@ -296,6 +296,31 @@ final class Repo {
         (try? await storage.from("outfits").createSignedURL(path: path, expiresIn: 3600))?.absoluteString
     }
 
+    /// Signs many outfit paths in one request instead of one round-trip each.
+    ///
+    /// Journal used to await `signedOutfitUrl` inside a loop, so a 200-entry
+    /// history cost 200 sequential round-trips before a single card could be
+    /// drawn. Storage signs a whole batch at once; chunking keeps any single
+    /// request from carrying an unreasonable body.
+    ///
+    /// Returns a path-keyed map. Paths that cannot be signed are simply absent
+    /// rather than throwing, so one deleted file cannot blank the whole screen.
+    func signedOutfitUrls(_ paths: [String], expiresIn: Int = 3600) async -> [String: String] {
+        let unique = Array(Set(paths.filter { !$0.isEmpty }))
+        guard !unique.isEmpty else { return [:] }
+        var out: [String: String] = [:]
+        for chunk in stride(from: 0, to: unique.count, by: 100).map({
+            Array(unique[$0 ..< min($0 + 100, unique.count)])
+        }) {
+            guard let results = try? await storage.from("outfits")
+                .createSignedURLs(paths: chunk, expiresIn: expiresIn) else { continue }
+            for r in results {
+                if case let .success(path, url) = r { out[path] = url.absoluteString }
+            }
+        }
+        return out
+    }
+
     func uploadClosetPhoto(bytes: Data, ext: String = "jpg") async throws -> String {
         guard let uid = userId else { throw RepoError.notSignedIn }
         let path = "\(uid)/\(UUID().uuidString.lowercased()).\(ext)"
@@ -308,6 +333,25 @@ final class Repo {
 
     func signedClosetUrl(_ path: String) async throws -> String? {
         (try? await storage.from("closet").createSignedURL(path: path, expiresIn: 3600))?.absoluteString
+    }
+
+    /// Batch counterpart to `signedClosetUrl`. See `signedOutfitUrls` — the
+    /// Studio grid and the Try On strip both walk a 200-piece closet, and doing
+    /// that one signature at a time is what made pieces trickle in.
+    func signedClosetUrls(_ paths: [String], expiresIn: Int = 3600) async -> [String: String] {
+        let unique = Array(Set(paths.filter { !$0.isEmpty }))
+        guard !unique.isEmpty else { return [:] }
+        var out: [String: String] = [:]
+        for chunk in stride(from: 0, to: unique.count, by: 100).map({
+            Array(unique[$0 ..< min($0 + 100, unique.count)])
+        }) {
+            guard let results = try? await storage.from("closet")
+                .createSignedURLs(paths: chunk, expiresIn: expiresIn) else { continue }
+            for r in results {
+                if case let .success(path, url) = r { out[path] = url.absoluteString }
+            }
+        }
+        return out
     }
 
     func insertClosetItem(_ item: ClosetItemInsert) async throws -> ClosetItem {
