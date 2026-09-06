@@ -21,6 +21,10 @@ struct OccasionCoachView: View {
     @State private var renders: [UUID: String] = [:]
     @State private var renderingId: UUID?
     @State private var renderErrors: [UUID: String] = [:]
+    /// Which combos have been written to the journal, and which one is being
+    /// written right now, so the button can say so instead of only toasting.
+    @State private var savedIds: Set<UUID> = []
+    @State private var savingId: UUID?
     @State private var closetPieces: [ClosetItem] = []
     @State private var pieceUrls: [String: String] = [:]
     @State private var chosenIds: Set<String> = []
@@ -461,6 +465,7 @@ struct OccasionCoachView: View {
                 error = nil
                 renders = [:]
                 renderErrors = [:]
+                savedIds = []
             } label: {
                 Text("Try another occasion")
                     .font(.system(size: 12, weight: .semibold))
@@ -503,17 +508,7 @@ struct OccasionCoachView: View {
             HStack(spacing: 10) {
                 generateButton(combo)
                 Spacer(minLength: 8)
-                Button {
-                    Haptic.tap()
-                    Task { await saveCombo(combo) }
-                } label: {
-                    Text("Save")
-                        .font(.system(size: 11, weight: .semibold))
-                        .tracking(1.5)
-                        .foregroundStyle(Palette.bronze)
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .overlay(Capsule().stroke(Palette.bronze, lineWidth: 1))
-                }
+                saveButton(combo)
             }
         }
         .padding(16)
@@ -688,11 +683,40 @@ struct OccasionCoachView: View {
         }
     }
 
+    @ViewBuilder
+    private func saveButton(_ combo: OccasionCombo) -> some View {
+        let saved = savedIds.contains(combo.id)
+        let saving = savingId == combo.id
+        Button {
+            Haptic.tap()
+            Task { await saveCombo(combo) }
+        } label: {
+            HStack(spacing: 5) {
+                if saved {
+                    Image(systemName: "checkmark").font(.system(size: 10, weight: .bold))
+                }
+                Text(saved ? "SAVED" : (saving ? "SAVING…" : "SAVE"))
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(1.5)
+            }
+            .foregroundStyle(saved ? Palette.paper : Palette.bronze)
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(saved ? Palette.bronze : Color.clear)
+            .overlay(Capsule().stroke(Palette.bronze, lineWidth: saved ? 0 : 1))
+            .clipShape(Capsule())
+        }
+        .disabled(saved || saving)
+        .animation(.easeInOut(duration: 0.2), value: saved)
+    }
+
     private func saveCombo(_ combo: OccasionCombo) async {
+        guard savingId == nil, !savedIds.contains(combo.id) else { return }
         guard let uid = Repo.shared.userId else {
             ToastBus.shared.post("Not signed in.")
             return
         }
+        savingId = combo.id
+        defer { savingId = nil }
         // Use the first matched closet piece's image as photo_path, or fall
         // back to an empty string (photo_path is required by the schema).
         var photoPath = ""
@@ -705,16 +729,25 @@ struct OccasionCoachView: View {
             }
         }
         let hem = combo.rationale.isEmpty ? combo.title : combo.rationale
-        _ = try? await Repo.shared.insertOutfit(OutfitInsert(
-            user_id: uid,
-            photo_path: photoPath,
-            score: 0.0,
-            occasion: prompt.trimmingCharacters(in: .whitespacesAndNewlines),
-            hem_comment: hem,
-            weather_c: nil, verdict: combo.title, subscores: nil, swaps: nil, annotations: nil,
-            kind: "occasion_plan", linked_piece_id: nil
-        ))
-        ToastBus.shared.post("Saved to journal.")
+        do {
+            // The write is awaited rather than fired and forgotten: the button
+            // now claims the combo is saved, so it must not say so before the
+            // row exists.
+            _ = try await Repo.shared.insertOutfit(OutfitInsert(
+                user_id: uid,
+                photo_path: photoPath,
+                score: 0.0,
+                occasion: prompt.trimmingCharacters(in: .whitespacesAndNewlines),
+                hem_comment: hem,
+                weather_c: nil, verdict: combo.title, subscores: nil, swaps: nil, annotations: nil,
+                kind: "occasion_plan", linked_piece_id: nil
+            ))
+            savedIds.insert(combo.id)
+            Haptic.tap()
+            ToastBus.shared.post("Saved to journal.")
+        } catch {
+            ToastBus.shared.post("Couldn't save: \(error.localizedDescription)")
+        }
     }
 
     private func refreshFree() async {
