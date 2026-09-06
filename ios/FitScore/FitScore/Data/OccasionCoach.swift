@@ -281,29 +281,44 @@ extension OccasionCoachService {
         return OccasionRender(imageUrl: outUrl, outfitId: outfitId, generatedPieceCount: generatedCount)
     }
 
+    /// The set every coach image is shot on. The server appends its own copy to
+    /// the prompts it writes; this is the client's, used for the fallback and —
+    /// restated for a worn look — for the stitch, so a combo and the pieces
+    /// inside it come back as one editorial instead of a pile of stock photos.
+    nonisolated private static let houseStyle =
+        "Editorial product photograph. Seamless warm grey-taupe backdrop with a soft light "
+        + "gradient. The garment rests on a raw concrete plinth, lit by soft directional light "
+        + "from the upper left casting one long soft shadow. NO person, NO mannequin, NO hanger, "
+        + "NO props, NO text, NO other garments. Sharp fabric and stitching detail, muted neutral "
+        + "colour grade."
+
     nonisolated private static func fallbackPrompt(for piece: OccasionPiece) -> String {
         let bits = [piece.color, piece.fabric ?? "", piece.name, piece.detail ?? ""]
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
-        return "Studio product photograph of \(bits). Isolated on a clean cream backdrop — "
-            + "NO person, NO mannequin, NO other garments in frame. Soft diffused studio lighting, "
-            + "sharp fabric and stitching detail, editorial catalog aesthetic."
+        return "\(bits)\n\n\(houseStyle)"
     }
 
-    /// Mirrors the Studio wizard's combine: a headless mannequin wearing exactly
-    /// what it was shown. The hard rules are there because the model will
-    /// otherwise invent a tee under a jacket or drop a bag entirely.
+    /// The stitch. Same set and same light as the pieces — the plinth and the
+    /// taupe backdrop carry over, with a mannequin standing on the plinth
+    /// instead of a garment lying on it, so a finished look sits beside its
+    /// pieces without a change of scene.
+    ///
+    /// The hard rules are there because the model will otherwise invent a tee
+    /// under a jacket or drop a bag entirely.
     nonisolated private static func combinePrompt(pieceList: String, count: Int) -> String {
         """
-        Studio product photograph. Dress a SINGLE headless matte-white androgynous MANNEQUIN \
+        Editorial product photograph. Dress a SINGLE headless matte-white androgynous MANNEQUIN \
         with EXACTLY these \(count) piece(s) and nothing else: \(pieceList).
 
         HARD RULES:
         - Use ONLY the garments shown in the reference images. Do NOT add, invent, or substitute anything.
         - Every reference garment must appear, worn in its natural position.
-        - Full body from shoulders to feet, standing upright, facing the camera.
-        - Clean cream backdrop, soft diffused studio lighting, sharp fabric detail.
+        - Full body from shoulders to feet, standing upright on a raw concrete plinth, facing the camera.
+        - Seamless warm grey-taupe backdrop with a soft light gradient.
+        - Soft directional light from the upper left, one long soft shadow across the plinth.
+        - Sharp fabric and stitching detail, muted neutral colour grade.
         - No head, no face, no text, no props.
         """
     }

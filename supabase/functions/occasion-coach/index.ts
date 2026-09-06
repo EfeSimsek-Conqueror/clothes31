@@ -52,6 +52,17 @@ function normalize(s: any): string {
   return String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+// Every image the coach produces is shot on the same set, so three combos and
+// the pieces inside them read as one editorial rather than a pile of stock
+// photos. Appended to each generate_prompt rather than left to the model, which
+// otherwise drifts backdrop and lighting from piece to piece.
+const HOUSE_STYLE =
+  "Editorial product photograph. Seamless warm grey-taupe backdrop with a soft " +
+  "light gradient. The garment rests on a raw concrete plinth, lit by soft " +
+  "directional light from the upper left casting one long soft shadow. " +
+  "NO person, NO mannequin, NO hanger, NO props, NO text, NO other garments. " +
+  "Sharp fabric and stitching detail, muted neutral colour grade.";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const json = (o: unknown, status = 200) =>
@@ -89,7 +100,7 @@ Return exactly 3 combinations. Each combination is a full outfit (top/bottom/sho
 
 Every chosen piece above MUST appear in EVERY combination, with its exact "id" copied into that piece's "matched_closet_id" and "generate_prompt" set to null. Keep its name as given. The combinations differ in what you build AROUND those pieces.
 
-Design every other piece from scratch: set "matched_closet_id" to null and write a "generate_prompt" for it. Never invent an id.
+Design every other piece from scratch: set "matched_closet_id" to null and write a "generate_prompt" for it. A generate_prompt describes ONLY the garment itself — its cut, cloth, colour and construction. Do not describe the backdrop, the lighting or the camera; those are fixed and added afterwards. Never invent an id.
 
 Output STRICT JSON only:
 {
@@ -135,11 +146,10 @@ No markdown, no prose outside JSON.`;
         // that invents one gets a generated piece instead of a wrong garment.
         const modelMatched = p?.matched_closet_id ? String(p.matched_closet_id) : null;
         const matched = modelMatched && mustUseIds.has(modelMatched) ? modelMatched : null;
-        const genPrompt = matched
-          ? null
-          : (typeof p?.generate_prompt === "string" && p.generate_prompt.trim().length > 0
-              ? String(p.generate_prompt)
-              : `Studio product photograph of ${p?.name ?? "garment"}, ${p?.color ?? ""} ${p?.category ?? ""}, soft neutral background, editorial lighting.`.trim());
+        const subject = (typeof p?.generate_prompt === "string" && p.generate_prompt.trim().length > 0)
+          ? String(p.generate_prompt).trim()
+          : `${p?.color ?? ""} ${p?.name ?? "garment"}`.trim();
+        const genPrompt = matched ? null : `${subject}\n\n${HOUSE_STYLE}`;
         return {
           name: String(p?.name ?? "Piece"),
           category: String(p?.category ?? ""),
