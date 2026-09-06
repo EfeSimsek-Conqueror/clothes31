@@ -216,6 +216,8 @@ private struct WizardSnapshot {
     let freeText: String
     let referenceUrl: String?
     let mannequinGender: String
+    /// "men's" / "women's" / "unisex" — the cut of the garment itself.
+    let garmentCut: String
     let prefFabrics: [String]
     let prefColors: [String]
     let sole: String?
@@ -238,13 +240,14 @@ private struct WizardSnapshot {
 }
 
 private extension WizardState {
-    func snapshot(mannequin: String, prefFabrics: [String], prefColors: [String]) -> WizardSnapshot {
+    func snapshot(mannequin: String, cut: String, prefFabrics: [String], prefColors: [String]) -> WizardSnapshot {
         WizardSnapshot(
             type: type, subtype: subtype, silhouette: silhouette,
             sleeveOrLength: sleeveOrLength, details: details, colors: colors,
             fabrics: fabrics, texture: texture, occasion: occasion, season: season,
             freeText: freeText, referenceUrl: referenceUrl,
-            mannequinGender: mannequin, prefFabrics: prefFabrics, prefColors: prefColors,
+            mannequinGender: mannequin, garmentCut: cut,
+            prefFabrics: prefFabrics, prefColors: prefColors,
             sole: sole, toe: toe, shoeHeight: shoeHeight, closureType: closureType,
             bagType: bagType, bagSize: bagSize, strap: strap, hardware: hardware,
             neckline: neckline, hoodieClosure: hoodieClosure,
@@ -346,7 +349,10 @@ private func renderPrompt(_ s: WizardSnapshot) -> String {
         against a clean cream studio backdrop
         """
 
-        return "Studio product photograph of a \(silhouettePart) \(subtypeToken)\(subtypePart) in \(colorPart) tones, " +
+        // The cut leads the description. A men's and a women's coat in the same
+        // colour and cloth are different garments, and the mannequin alone
+        // cannot say which one is wanted — a flat lay has no mannequin at all.
+        return "Studio product photograph of a \(s.garmentCut) \(silhouettePart) \(subtypeToken)\(subtypePart) in \(colorPart) tones, " +
             "\(fabricPart)\(texturePart)\(detailsPart)\(lenPart), for \(occasion) \(season) wear, " +
             "\(bodyForm). " +
             "The MANNEQUIN MUST show: full body, both arms attached and visible, no cropping at the arms or waist. " +
@@ -459,6 +465,9 @@ struct StudioCreateView: View {
     @State private var state = WizardState()
     @State private var stepIndex = 0
     @State private var mannequinGender = "androgynous"
+    /// How the garment itself is cut, carried into the prompt separately from
+    /// the mannequin: a flat lay has no form to imply it.
+    @State private var garmentCut = Gender.unknownCut
     @State private var prefFabrics: [String] = []
     @State private var prefColors: [String] = []
 
@@ -495,11 +504,11 @@ struct StudioCreateView: View {
         .background(Palette.paper.ignoresSafeArea())
         .task {
             if let p = try? await Repo.shared.currentProfile() {
-                switch p.gender {
-                case "Female": mannequinGender = "female"
-                case "Male": mannequinGender = "male"
-                default: mannequinGender = "androgynous"
-                }
+                // Tolerant read: the stored value has several spellings, and an
+                // exact match was quietly turning a real answer into no answer.
+                let g = Gender(stored: p.gender)
+                mannequinGender = g?.mannequinForm ?? "androgynous"
+                garmentCut = g?.cutPhrase ?? Gender.unknownCut
                 prefFabrics = p.preferred_fabrics ?? []
                 prefColors = p.preferred_colors ?? []
             }
@@ -786,7 +795,7 @@ struct StudioCreateView: View {
     }
 
     private func buildPrompt() -> String {
-        renderPrompt(state.snapshot(mannequin: mannequinGender, prefFabrics: prefFabrics, prefColors: prefColors))
+        renderPrompt(state.snapshot(mannequin: mannequinGender, cut: garmentCut, prefFabrics: prefFabrics, prefColors: prefColors))
     }
 
     // MARK: - Generation
@@ -823,7 +832,7 @@ struct StudioCreateView: View {
         generatingVariations = true
         error = nil
         defer { generatingVariations = false }
-        let snap = state.snapshot(mannequin: mannequinGender, prefFabrics: prefFabrics, prefColors: prefColors)
+        let snap = state.snapshot(mannequin: mannequinGender, cut: garmentCut, prefFabrics: prefFabrics, prefColors: prefColors)
         let refs = [state.referenceUrl].compactMap { $0 }
         // Parallel generation
         async let r0 = generateOne(snap: snap, index: 0, axis: axis, refs: refs)

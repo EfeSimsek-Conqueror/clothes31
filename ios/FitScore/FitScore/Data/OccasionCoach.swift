@@ -209,6 +209,8 @@ extension OccasionCoachService {
     /// Try On can actually wear it. Try On reads the closet, not `outfits`.
     static func generateOutfit(combo: OccasionCombo, occasion: String) async throws -> OccasionRender {
         guard let uid = Repo.shared.userId else { throw RepoError.notSignedIn }
+        let cut = Gender(stored: try? await Repo.shared.currentProfile()?.gender)?.cutPhrase
+            ?? Gender.unknownCut
 
         // 1. Reference image per piece, in the combo's own order so the combine
         //    prompt's numbering lines up with the pieces it names.
@@ -224,7 +226,7 @@ extension OccasionCoachService {
                         guard let path = item.image_path else { return (idx, nil, false) }
                         return (idx, try? await Repo.shared.signedClosetUrl(path), false)
                     }
-                    let prompt = piece.generate_prompt ?? Self.fallbackPrompt(for: piece)
+                    let prompt = piece.generate_prompt ?? Self.fallbackPrompt(for: piece, cut: cut)
                     let out = try await Repo.shared.generatePiece(prompt: prompt)
                     guard let url = out.image_url, !url.isEmpty else { return (idx, nil, false) }
                     await Self.fileInCloset(url: url, piece: piece, uid: uid)
@@ -292,8 +294,8 @@ extension OccasionCoachService {
         + "NO props, NO text, NO other garments. Sharp fabric and stitching detail, muted neutral "
         + "colour grade."
 
-    nonisolated private static func fallbackPrompt(for piece: OccasionPiece) -> String {
-        let bits = [piece.color, piece.fabric ?? "", piece.name, piece.detail ?? ""]
+    nonisolated private static func fallbackPrompt(for piece: OccasionPiece, cut: String) -> String {
+        let bits = [cut, piece.color, piece.fabric ?? "", piece.name, piece.detail ?? ""]
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .joined(separator: ", ")

@@ -1111,10 +1111,14 @@ final class Repo {
             let preferred_colors: [String]?
             let sensitivities: String?
         }
+        // Write one spelling. The column had accumulated "Male" beside "male"
+        // beside "unspecified", and readers that matched exactly were dropping
+        // real answers on the floor.
+        let canonicalGender = Gender(stored: gender)?.rawValue
         try await Supa.client
             .from("profiles")
             .update(Patch(
-                gender: gender,
+                gender: canonicalGender,
                 style_tags: styleTags,
                 preferred_fabrics: preferredFabrics,
                 preferred_colors: preferredColors,
@@ -1294,6 +1298,7 @@ final class Repo {
             let body_profile: BodyProfile?
             let closet_items: [Piece]
             let style_tags: [String]?
+            let cut: String?
         }
         let items = closet.prefix(30).compactMap { c -> Piece? in
             guard let id = c.id else { return nil }
@@ -1311,7 +1316,8 @@ final class Repo {
             notes: notes,
             body_profile: bodyProfile,
             closet_items: Array(items),
-            style_tags: styleTags
+            style_tags: styleTags,
+            cut: Gender(stored: try? await currentProfile()?.gender)?.cutPhrase
         )
         let decoder = JSONDecoder()
         do {

@@ -299,13 +299,18 @@ enum StylistApi {
     struct Payload: Encodable {
         let messages: [Msg]
         let image_base64: String?
+        /// "men's" / "women's" / "unisex". Advice is the one place the answer
+        /// changes what should be said rather than only how it is rendered.
+        let cut: String?
     }
     struct Reply: Decodable { let text: String? ; let error: String? }
 
     static func send(history: [Msg], imageData: Data?) async throws -> String {
+        let cut = Gender(stored: try? await Repo.shared.currentProfile()?.gender)?.cutPhrase
         let payload = Payload(
             messages: history,
-            image_base64: imageData?.base64EncodedString()
+            image_base64: imageData?.base64EncodedString(),
+            cut: cut
         )
         do {
             let r: Reply = try await Supa.client.functions.invoke(

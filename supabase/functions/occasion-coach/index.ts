@@ -79,7 +79,14 @@ Deno.serve(async (req) => {
     // everything else in the combo is designed from scratch.
     const mustUse = Array.isArray(body?.must_use) ? body.must_use : [];
     const styleProfile = body?.style_profile ?? {};
-    const gender = String(styleProfile?.gender ?? "unspecified");
+    // One spelling, and never a guess: an unanswered profile gets "unisex"
+    // rather than a default gender.
+    const g = String(styleProfile?.gender ?? "").trim().toLowerCase();
+    const cut = g === "female" || g === "f" || g === "woman"
+      ? "women's"
+      : g === "male" || g === "m" || g === "man"
+      ? "men's"
+      : "unisex";
     const styleTags: string[] = Array.isArray(styleProfile?.style_tags) ? styleProfile.style_tags : [];
 
     const mustUseSlim = mustUse.slice(0, 8).map((c: Record<string, unknown>) => ({
@@ -91,7 +98,7 @@ Deno.serve(async (req) => {
     const sys = `You are Hem, an editorial fashion stylist. The user needs 3 outfit combinations for this occasion:
 "${promptText}"
 
-The user's gender: ${gender}
+Every garment you name is ${cut} — cut, proportion and detailing follow from that.
 Style tags: ${JSON.stringify(styleTags)}
 Pieces the wearer has chosen and wants to wear${mustUseSlim.length ? "" : " (none — design everything)"}:
 ${JSON.stringify(mustUseSlim)}
@@ -100,7 +107,7 @@ Return exactly 3 combinations. Each combination is a full outfit (top/bottom/sho
 
 Every chosen piece above MUST appear in EVERY combination, with its exact "id" copied into that piece's "matched_closet_id" and "generate_prompt" set to null. Keep its name as given. The combinations differ in what you build AROUND those pieces.
 
-Design every other piece from scratch: set "matched_closet_id" to null and write a "generate_prompt" for it. A generate_prompt describes ONLY the garment itself — its cut, cloth, colour and construction. Do not describe the backdrop, the lighting or the camera; those are fixed and added afterwards. Never invent an id.
+Design every other piece from scratch: set "matched_closet_id" to null and write a "generate_prompt" for it. A generate_prompt describes ONLY the garment itself — its cut, cloth, colour and construction — and must open with "${cut}" so the render is cut for this wearer. Do not describe the backdrop, the lighting or the camera; those are fixed and added afterwards. Never invent an id.
 
 Output STRICT JSON only:
 {

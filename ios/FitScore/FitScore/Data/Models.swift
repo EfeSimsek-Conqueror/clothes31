@@ -425,6 +425,48 @@ enum Gender: String, CaseIterable, Identifiable, Sendable {
         case .other:  return "Show me everything."
         }
     }
+
+    /// Read whatever is actually stored on the profile.
+    ///
+    /// The column is free text and has collected several spellings — "Male" and
+    /// "male" both exist, alongside "unspecified". Code that matched the exact
+    /// enum casing silently treated a lowercase row as no answer at all, so a
+    /// wearer who had answered still got androgynous renders. Anything
+    /// unrecognised, empty or explicitly unspecified reads as nil, which means
+    /// "not answered" rather than a third gender.
+    init?(stored raw: String?) {
+        let v = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch v {
+        case "female", "f", "woman", "women", "feminine": self = .female
+        case "male", "m", "man", "men", "masculine":      self = .male
+        case "other", "nonbinary", "non-binary", "any", "all": self = .other
+        default: return nil
+        }
+    }
+
+    /// Which mannequin a generated garment hangs on.
+    var mannequinForm: String {
+        switch self {
+        case .female: return "female"
+        case .male:   return "male"
+        case .other:  return "androgynous"
+        }
+    }
+
+    /// How the garment itself is cut. This belongs in the description of the
+    /// piece, not only in the form it is shown on — a flat lay has no mannequin
+    /// to carry it, and a men's and a women's coat in the same colour are not
+    /// the same coat.
+    var cutPhrase: String {
+        switch self {
+        case .female: return "women's"
+        case .male:   return "men's"
+        case .other:  return "unisex"
+        }
+    }
+
+    /// What the model is told when the wearer has not answered. Never guessed.
+    static let unknownCut = "unisex"
 }
 
 /// Response payload from the `generate-piece` / `tryon-outfit` edge functions.
