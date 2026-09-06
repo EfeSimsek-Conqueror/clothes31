@@ -87,7 +87,14 @@ Deno.serve(async (req: Request) => {
     `Return strict JSON with this exact shape: ` +
     `{"pieces": [{"name": string, "detail": string, "fabric": string, "type": string, "colors": [string], "silhouette": string, "note": string}], ` +
     `"palette_hex": [string], ` +
-    `"style_signature": string}. ` +
+    `"palette_names": [string], ` +
+    `"style_signature": string, ` +
+    `"signature_note": string, ` +
+    `"dress_code": string, ` +
+    `"mood_tags": [string], ` +
+    `"styling_notes": [string], ` +
+    `"make_it_yours": [{"swap": string, "why": string}], ` +
+    `"where_it_works": [string]}. ` +
     `Rules: ` +
     `- pieces: 3 to 7 items, one per visible garment or major accessory. ` +
     `- name: 2-4 words, sentence case (only the first letter capitalised), a natural garment name a stylist would say out loud ("Boxy chore jacket", "Straight mid-grey trousers", "Ribbed crew tee", "Leather derbies"). NEVER a bare type word like "jacket". NEVER put the fabric in the name. ` +
@@ -99,6 +106,13 @@ Deno.serve(async (req: Request) => {
     `- note: a stylist-scribble under 60 chars naming the crucial detail. Required — older clients still read it. ` +
     `- palette_hex: exactly 5 hex colors when the image supports it, minimum 3 ("#B4A38A"), sampled from the look, most-dominant first. ` +
     `- style_signature: MAX 60 characters, editorial voice, no cliches, ends with a period. E.g. "Quiet tailoring with a workwear spine.". ` +
+    `- palette_names: one human colour name per palette_hex entry, same order, same count ("bone", "washed indigo", "tobacco"). ` +
+    `- signature_note: 1-2 sentences, max 220 characters, saying WHY the look reads the way the signature claims — name the specific choice doing the work. ` +
+    `- dress_code: where this sits on the formality ladder, 2-5 words ("smart casual, leaning tailored"). ` +
+    `- mood_tags: 3 single-word lowercase adjectives for the mood ("restrained","tactile","assured"). ` +
+    `- styling_notes: exactly 3 entries, each under 90 characters, each naming a concrete mechanic that makes the look work (proportion, colour relationship, texture contrast, break point). Not compliments — mechanics. ` +
+    `- make_it_yours: 2 or 3 entries. swap: a specific alternative piece under 40 characters. why: what it changes, under 70 characters. ` +
+    `- where_it_works: 2 to 4 short occasion labels ("gallery opening","office offsite","first date"). ` +
     `Return ONLY JSON.`;
 
   const falResp = await fetch("https://fal.run/fal-ai/any-llm/vision", {
@@ -178,10 +192,39 @@ Deno.serve(async (req: Request) => {
 
   const style_signature = String(parsed.style_signature ?? "").trim().slice(0, 120);
 
+  // v3 additions. Every one is optional on the client, so a build that predates
+  // them keeps rendering the v2 read rather than failing to decode.
+  const strList = (v: unknown, max: number, len: number): string[] =>
+    Array.isArray(v)
+      ? v.slice(0, max).map((x) => String(x ?? "").trim().slice(0, len)).filter(Boolean)
+      : [];
+
+  // Names are meaningless unless they line up with the swatches they label, so
+  // a mismatched count is dropped rather than shown against the wrong colour.
+  const namesRaw = strList(parsed.palette_names, 8, 28);
+  const palette_names = namesRaw.length === palette_hex.length ? namesRaw : [];
+
+  const make_it_yours = Array.isArray(parsed.make_it_yours)
+    ? parsed.make_it_yours
+        .slice(0, 3)
+        .map((m: any) => ({
+          swap: String(m?.swap ?? "").trim().slice(0, 48),
+          why: String(m?.why ?? "").trim().slice(0, 90),
+        }))
+        .filter((m: { swap: string }) => m.swap.length > 0)
+    : [];
+
   return json(200, {
     pieces,
     palette_hex,
+    palette_names,
     style_signature,
-    version: "v2",
+    signature_note: String(parsed.signature_note ?? "").trim().slice(0, 260),
+    dress_code: String(parsed.dress_code ?? "").trim().slice(0, 60),
+    mood_tags: strList(parsed.mood_tags, 4, 20),
+    styling_notes: strList(parsed.styling_notes, 3, 120),
+    make_it_yours,
+    where_it_works: strList(parsed.where_it_works, 4, 32),
+    version: "v3",
   });
 });

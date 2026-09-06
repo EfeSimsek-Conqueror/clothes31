@@ -88,8 +88,16 @@ struct MainTabView: View {
                 OccasionCoachView(onClose: { cameraBus.pending = nil },
                                   onOpenPaywall: { cameraBus.request(.paywall, context: nil) })
             case .cover:
-                MagazineCoverSheet(outfitId: nil,
-                                   onClose: { cameraBus.pending = nil })
+                // Magazine covers are shelved, so the route stays wired but must
+                // not present anything; the entry points are hidden too, and a
+                // stray request self-dismisses rather than stranding the user on
+                // a blank cover they cannot close.
+                if Supa.magazineCoversEnabled {
+                    MagazineCoverSheet(outfitId: nil,
+                                       onClose: { cameraBus.pending = nil })
+                } else {
+                    Color.clear.onAppear { cameraBus.pending = nil }
+                }
             case .invitation:
                 InvitationDecoderView(onClose: { cameraBus.pending = nil },
                                       onOpenPaywall: { cameraBus.request(.paywall, context: nil) })

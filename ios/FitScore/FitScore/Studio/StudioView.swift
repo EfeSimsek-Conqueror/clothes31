@@ -96,14 +96,23 @@ struct StudioView: View {
                 Task { await refresh() }
             })
         }
+        // Covers are shelved behind a flag rather than removed, so the three
+        // cover presentations stay wired up and only their contents are gated —
+        // flipping the flag back on restores the flow with no structural edit.
         .fullScreenCover(isPresented: $showCoverComposer) {
-            MagazineCoverSheet(outfitId: nil, onClose: { showCoverComposer = false })
+            if Supa.magazineCoversEnabled {
+                MagazineCoverSheet(outfitId: nil, onClose: { showCoverComposer = false })
+            }
         }
         .fullScreenCover(isPresented: $showCoverTemplate) {
-            CoverTemplateCreatorView(onClose: { showCoverTemplate = false })
+            if Supa.magazineCoversEnabled {
+                CoverTemplateCreatorView(onClose: { showCoverTemplate = false })
+            }
         }
         .fullScreenCover(item: $previewCover) { wrap in
-            CoverPreviewSheet(cover: wrap.cover, onClose: { previewCover = nil })
+            if Supa.magazineCoversEnabled {
+                CoverPreviewSheet(cover: wrap.cover, onClose: { previewCover = nil })
+            }
         }
         .fullScreenCover(item: $editingItem) { item in
             StudioCreateView(
@@ -252,7 +261,7 @@ struct StudioView: View {
 
     @ViewBuilder
     private var coversRail: some View {
-        if !covers.isEmpty {
+        if Supa.magazineCoversEnabled, !covers.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 Eyebrow(text: "MY COVERS · \(covers.count)")
                     .padding(.horizontal, 20)
@@ -393,23 +402,25 @@ struct StudioView: View {
                     actionCard(title: busy ? "Uploading…" : "↑ Import", subtitle: "Photo or icon")
                 }
             }
-            Button { Haptic.tap(); showCoverComposer = true } label: {
-                coverActionCard(
-                    icon: "text.book.closed.fill",
-                    title: "Compose a Cover",
-                    subtitle: "Two photos → editorial magazine cover"
-                )
-            }
-            .buttonStyle(.plain)
+            if Supa.magazineCoversEnabled {
+                Button { Haptic.tap(); showCoverComposer = true } label: {
+                    coverActionCard(
+                        icon: "text.book.closed.fill",
+                        title: "Compose a Cover",
+                        subtitle: "Two photos → editorial magazine cover"
+                    )
+                }
+                .buttonStyle(.plain)
 
-            Button { Haptic.tap(); showCoverTemplate = true } label: {
-                coverActionCard(
-                    icon: "square.grid.2x2.fill",
-                    title: "Create Cover Template",
-                    subtitle: "Design a style — no photo. Reuse later."
-                )
+                Button { Haptic.tap(); showCoverTemplate = true } label: {
+                    coverActionCard(
+                        icon: "square.grid.2x2.fill",
+                        title: "Create Cover Template",
+                        subtitle: "Design a style — no photo. Reuse later."
+                    )
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -518,7 +529,9 @@ struct StudioView: View {
             }
             imageUrls = urls
         }
-        if let c = try? await Repo.shared.loadCovers() {
+        // While covers are shelved nothing renders them, so skip the fetch
+        // rather than paying for a round-trip whose result is never shown.
+        if Supa.magazineCoversEnabled, let c = try? await Repo.shared.loadCovers() {
             covers = c
         }
     }

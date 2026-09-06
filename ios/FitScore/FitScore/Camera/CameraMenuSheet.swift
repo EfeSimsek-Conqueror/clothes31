@@ -121,19 +121,23 @@ struct CameraMenuSheet: View {
                         dismiss()
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { CameraMenuBus.shared.request(.occasion) }
                     })
-                Hairline()
-                row("cover", icon: "text.book.closed.fill",
-                    title: "Compose a cover",
-                    subtitle: "Your fit, on the cover.",
-                    cost: "\(Supa.magazineCoverCost) credits",
-                    description: "Turn any fit into an editorial magazine cover — masthead, headline, pull-quote. Made to be shared.",
-                    needs: "1 photo (or pick from Journal).",
-                    goLabel: "GO →",
-                    proLocked: false,
-                    onGo: {
-                        dismiss()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { CameraMenuBus.shared.request(.cover) }
-                    })
+                // Covers are shelved, so the whole accordion entry — including its
+                // leading hairline — drops out to avoid a doubled divider here.
+                if Supa.magazineCoversEnabled {
+                    Hairline()
+                    row("cover", icon: "text.book.closed.fill",
+                        title: "Compose a cover",
+                        subtitle: "Your fit, on the cover.",
+                        cost: "\(Supa.magazineCoverCost) credits",
+                        description: "Turn any fit into an editorial magazine cover — masthead, headline, pull-quote. Made to be shared.",
+                        needs: "1 photo (or pick from Journal).",
+                        goLabel: "GO →",
+                        proLocked: false,
+                        onGo: {
+                            dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { CameraMenuBus.shared.request(.cover) }
+                        })
+                }
                 Hairline()
                 row("invitation", icon: "envelope.open.fill",
                     title: "Decode the invite",

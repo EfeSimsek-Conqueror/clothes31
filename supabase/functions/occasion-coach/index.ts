@@ -108,13 +108,20 @@ Output STRICT JSON only:
     {
       "title": "Short editorial title (<=6 words)",
       "rationale": "One editorial sentence explaining why this works (<=140 chars)",
+      "palette_hex": ["#2E2A26", "#6E6558", "#D8CDB9"],
       "pieces": [
-        {"name": "Cream linen suit jacket", "category": "outerwear", "color": "cream", "matched_closet_id": "abc-123", "generate_prompt": null},
-        {"name": "...", "category": "...", "color": "...", "matched_closet_id": null, "generate_prompt": "Studio product photograph of..."}
+        {"name": "Cream linen suit jacket", "category": "outerwear", "color": "cream", "fabric": "washed linen", "detail": "dropped shoulder", "matched_closet_id": "abc-123", "generate_prompt": null},
+        {"name": "...", "category": "...", "color": "...", "fabric": "...", "detail": "...", "matched_closet_id": null, "generate_prompt": "Studio product photograph of..."}
       ]
     }
   ]
 }
+Field rules:
+- name: 2-4 words, sentence case, a garment name said out loud ("Charcoal wool hoodie", "Straight indigo jeans"). Never a bare type word like "jacket".
+- category: one lowercase token — top, bottom, outerwear, dress, shoes, accessory.
+- fabric: 1-2 words ("brushed cotton", "wool blend").
+- detail: 1-3 words naming the one construction detail that matters ("dropped shoulder", "no break", "round toe").
+- palette_hex: 3 to 5 hex colours for THIS combo, most-dominant first, drawn from the pieces you named.
 No markdown, no prose outside JSON.`;
 
     const raw = await llm(sys);
@@ -125,6 +132,14 @@ No markdown, no prose outside JSON.`;
     const combos = combosIn.slice(0, 3).map((c: any) => ({
       title: String(c?.title ?? "Look").slice(0, 80),
       rationale: String(c?.rationale ?? "").slice(0, 200),
+      // Per-combo palette. Anything that is not a well-formed hex triplet is
+      // dropped rather than shown as a broken swatch.
+      palette_hex: (Array.isArray(c?.palette_hex) ? c.palette_hex : [])
+        .slice(0, 6)
+        // deno-lint-ignore no-explicit-any
+        .map((h: any) => String(h ?? "").trim().toUpperCase())
+        .filter((h: string) => /^#[0-9A-F]{6}$/.test(h))
+        .slice(0, 5),
       // deno-lint-ignore no-explicit-any
       pieces: (Array.isArray(c?.pieces) ? c.pieces : []).map((p: any) => {
         const modelMatched = p?.matched_closet_id ? String(p.matched_closet_id) : null;
@@ -139,6 +154,8 @@ No markdown, no prose outside JSON.`;
           name: String(p?.name ?? "Piece"),
           category: String(p?.category ?? ""),
           color: String(p?.color ?? ""),
+          fabric: String(p?.fabric ?? "").trim().slice(0, 32),
+          detail: String(p?.detail ?? "").trim().slice(0, 40),
           matched_closet_id: matched,
           generate_prompt: genPrompt,
         };

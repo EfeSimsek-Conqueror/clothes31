@@ -177,6 +177,14 @@ struct DecodeView: View {
                         piecesSection(res)
                     }
                     paletteSection(res)
+                    if !res.styling_notes.isEmpty {
+                        Hairline()
+                        stylingNotesSection(res)
+                    }
+                    if !res.make_it_yours.isEmpty {
+                        Hairline()
+                        swapsSection(res)
+                    }
                 }
                 .padding(.top, 4)
             }
@@ -191,10 +199,12 @@ struct DecodeView: View {
             RoundedRectangle(cornerRadius: 16).fill(Palette.card)
 
             if let img = pickedImage {
+                // Fit, not fill: a reference look is the whole point of this
+                // screen, and cropping it to the tile hides the shoes or the
+                // hemline the read is about.
                 Image(uiImage: img)
                     .resizable()
-                    .scaledToFill()
-                    .clipped()
+                    .scaledToFit()
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .overlay(alignment: .bottomTrailing) {
                         Text("CHANGE")
@@ -219,8 +229,11 @@ struct DecodeView: View {
                     Text("Reference photo")
                         .font(Serif.body(13))
                         .foregroundStyle(Palette.ink)
-                    Button { showFileImporter = true } label: {
-                        Text("or browse files")
+                    // The library, not the file browser. This screen reads a
+                    // photograph of a look; asking for a file sends people into
+                    // iCloud Drive looking for something that lives in Photos.
+                    Button { showPhotoPicker = true } label: {
+                        Text("or choose from library")
                             .font(Serif.body(12))
                             .underline()
                             .foregroundStyle(Palette.muted)
@@ -284,6 +297,84 @@ struct DecodeView: View {
                 .font(Serif.display(22))
                 .foregroundStyle(Palette.ink)
                 .fixedSize(horizontal: false, vertical: true)
+            if !res.signature_note.isEmpty {
+                Text(res.signature_note)
+                    .font(Serif.body(14))
+                    .foregroundStyle(Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !res.dress_code.isEmpty || !res.mood_tags.isEmpty || !res.where_it_works.isEmpty {
+                readTags(res)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Dress code, mood and where it works, as one wrapped run of chips. They
+    /// are all short labels answering "what is this, and when", so they read
+    /// better together than as three separate titled sections.
+    @ViewBuilder
+    private func readTags(_ res: DecodeResponse) -> some View {
+        let tags: [(String, Bool)] =
+            (res.dress_code.isEmpty ? [] : [(res.dress_code, true)])
+            + res.mood_tags.map { ($0, false) }
+            + res.where_it_works.map { ($0, false) }
+        FlowLayout(spacing: 6) {
+            ForEach(Array(tags.enumerated()), id: \.offset) { _, t in
+                Text(t.0.uppercased())
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .tracking(1.3)
+                    .foregroundStyle(t.1 ? Palette.paper : Palette.ink)
+                    .padding(.horizontal, 9).padding(.vertical, 5)
+                    .background(t.1 ? Palette.ink : Palette.card)
+                    .overlay(Capsule().stroke(Palette.hairline, lineWidth: t.1 ? 0 : 1))
+                    .clipShape(Capsule())
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    @ViewBuilder
+    private func stylingNotesSection(_ res: DecodeResponse) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Eyebrow(text: "WHY IT WORKS")
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(res.styling_notes.enumerated()), id: \.offset) { i, note in
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(String(format: "%02d", i + 1))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Palette.bronze)
+                        Text(note)
+                            .font(Serif.body(14))
+                            .foregroundStyle(Palette.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func swapsSection(_ res: DecodeResponse) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Eyebrow(text: "MAKE IT YOURS")
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(res.make_it_yours.enumerated()), id: \.offset) { i, sw in
+                    if i > 0 { Hairline() }
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(sw.swap)
+                            .font(Serif.body(15))
+                            .foregroundStyle(Palette.ink)
+                        Spacer(minLength: 12)
+                        Text(sw.why)
+                            .font(Serif.body(11))
+                            .foregroundStyle(Palette.muted)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .padding(.vertical, 11)
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -325,8 +416,10 @@ struct DecodeView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Eyebrow(text: "PALETTE")
                 HStack(spacing: 6) {
-                    ForEach(res.palette_hex, id: \.self) { hex in
-                        PaletteSwatch(hex: hex, color: Self.colorFromHex(hex) ?? Palette.muted)
+                    ForEach(Array(res.palette_hex.enumerated()), id: \.offset) { i, hex in
+                        PaletteSwatch(hex: hex,
+                                      color: Self.colorFromHex(hex) ?? Palette.muted,
+                                      name: res.paletteName(at: i))
                     }
                 }
             }
@@ -580,12 +673,23 @@ private struct PieceRow: View {
 private struct PaletteSwatch: View {
     let hex: String
     let color: Color
+    /// Human colour name, when the read supplied one for this swatch. The hex
+    /// stays underneath it — the name is what a person repeats, the hex is what
+    /// they paste somewhere.
+    var name: String?
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 4) {
             RoundedRectangle(cornerRadius: 10)
                 .fill(color)
                 .frame(height: 54)
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Palette.hairline, lineWidth: 1))
+            if let name, !name.isEmpty {
+                Text(name)
+                    .font(Serif.body(10))
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
             Text(hex.uppercased())
                 .font(.system(size: 8, weight: .medium))
                 .foregroundStyle(Palette.muted)

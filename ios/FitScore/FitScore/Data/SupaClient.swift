@@ -39,10 +39,18 @@ enum Supa {
     static let versusCost = 8
     static let roastCost = 5
     static let decodeCost = 10
-    static let occasionCost = 15
+    /// Occasion Coach's written plan — three combos, text only. Rendering a
+    /// combo into actual garment images is billed separately below.
+    static let occasionCost = 10
     // Sprint 1-5 additions — set to keep 40%+ margin over Fal/Nano-banana costs.
     static let bodyCalibrationCost = 0       // one-time, foundational
     static let magazineCoverCost = 10        // nano-banana render + headline
+
+    /// Magazine covers are shelved. The feature is complete and its code is
+    /// kept intact — this flag only hides every way in. Flip it to `true` to
+    /// bring the whole thing back; see `docs/COVER_SHELVED.md` for what it was
+    /// and what to re-check before unshelving.
+    static let magazineCoversEnabled = false
     static let mirrorCleanerCost = 0         // bundled as loyalty perk
     static let invitationDecodeCost = 6      // OCR + combo generation
     static let coverTemplateCost = 2         // Fal flux/schnell placeholder + SVG chrome
@@ -61,6 +69,20 @@ enum Supa {
     static let extraAlternativesCost = 5             // "3 yeni alternatif" reroll
     static let singleAlternativeRegenCost = 2        // per-alternative regen
     static let studioCombineStandaloneCost = 6       // outfit combine at end
+
+    /// One garment render for an Occasion Coach combo. Cheaper per piece than
+    /// `singlePieceCost` because the coach renders a single image rather than
+    /// the three alternatives the Studio wizard bills for.
+    static let occasionPieceRenderCost = 6
+
+    /// Credits to turn a written combo into a real outfit image.
+    ///
+    /// Only pieces the wearer does not already own are rendered — a combo built
+    /// entirely from the closet costs nothing but the combine. That is the
+    /// point: a fuller closet makes the coach cheaper.
+    static func occasionOutfitCost(missingPieces n: Int) -> Int {
+        max(0, n) * occasionPieceRenderCost + studioCombineStandaloneCost
+    }
 
     /// Convenience: total credits for an N-piece outfit generation (each piece
     /// yields 3 alternatives). Rejects/regens/combine are billed on top.

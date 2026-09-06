@@ -15,6 +15,11 @@ struct OccasionCoachView: View {
     @State private var combos: [OccasionCombo] = []
     @State private var freeAvailable: Bool = false
     @State private var checkedFree = false
+    /// Per-combo render state, keyed by combo id: the finished outfit image,
+    /// which combo is currently rendering, and any failure to show in place.
+    @State private var renders: [UUID: String] = [:]
+    @State private var renderingId: UUID?
+    @State private var renderErrors: [UUID: String] = [:]
     @FocusState private var promptFocused: Bool
 
     private let presets = ["Wedding", "Interview", "Date", "Casual", "Party", "Trip", "Weekend"]
@@ -105,8 +110,9 @@ struct OccasionCoachView: View {
     }
 
     private var buttonTitle: String {
-        if !checkedFree { return "Get 3 combos · 15 credits" }
-        return freeAvailable ? "Get 3 combos · free this week" : "Get 3 combos · 15 credits"
+        let paid = "Get 3 combos · \(Supa.occasionCost) credits"
+        if !checkedFree { return paid }
+        return freeAvailable ? "Get 3 combos · free this week" : paid
     }
 
     private var loadingBlock: some View {
@@ -132,6 +138,8 @@ struct OccasionCoachView: View {
                 Haptic.chip()
                 combos = []
                 error = nil
+                renders = [:]
+                renderErrors = [:]
             } label: {
                 Text("Try another occasion")
                     .font(.system(size: 12, weight: .semibold))
@@ -155,6 +163,9 @@ struct OccasionCoachView: View {
                     .font(Serif.italic(14))
                     .foregroundStyle(Palette.muted)
             }
+            if let palette = combo.palette_hex, !palette.isEmpty {
+                paletteRow(palette)
+            }
             Hairline()
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(combo.pieces.enumerated()), id: \.offset) { idx, p in
@@ -162,16 +173,26 @@ struct OccasionCoachView: View {
                     pieceRow(p)
                 }
             }
-            Button {
-                Haptic.tap()
-                Task { await saveCombo(combo) }
-            } label: {
-                Text("Save combo")
-                    .font(.system(size: 11, weight: .semibold))
-                    .tracking(1.5)
-                    .foregroundStyle(Palette.bronze)
-                    .padding(.horizontal, 12).padding(.vertical, 6)
-                    .overlay(Capsule().stroke(Palette.bronze, lineWidth: 1))
+            if let url = renders[combo.id] {
+                renderedLook(url)
+            }
+            if let e = renderErrors[combo.id] {
+                Text(e).font(Serif.body(12)).foregroundStyle(Palette.bronze)
+            }
+            HStack(spacing: 10) {
+                generateButton(combo)
+                Spacer(minLength: 8)
+                Button {
+                    Haptic.tap()
+                    Task { await saveCombo(combo) }
+                } label: {
+                    Text("Save")
+                        .font(.system(size: 11, weight: .semibold))
+                        .tracking(1.5)
+                        .foregroundStyle(Palette.bronze)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .overlay(Capsule().stroke(Palette.bronze, lineWidth: 1))
+                }
             }
         }
         .padding(16)
@@ -195,30 +216,114 @@ struct OccasionCoachView: View {
                 Text(p.name)
                     .font(Serif.body(14, weight: .medium))
                     .foregroundStyle(Palette.ink)
+                if !p.meta.isEmpty {
+                    Text(p.meta)
+                        .font(Serif.body(11))
+                        .foregroundStyle(Palette.muted)
+                }
             }
-            Spacer()
-            if p.matched_closet_id != nil {
+            Spacer(minLength: 10)
+            // Ownership is the only status worth a badge here: it is what
+            // decides whether this piece costs anything to render.
+            if p.isOwned {
                 HStack(spacing: 4) {
                     Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold))
                     Text("IN CLOSET").font(.system(size: 9.5, weight: .semibold)).tracking(1.4)
                 }
                 .foregroundStyle(Color(red: 0.20, green: 0.55, blue: 0.32))
-            } else if let gp = p.generate_prompt {
-                Button {
-                    Haptic.chip()
-                    UIPasteboard.general.string = gp
-                    ToastBus.shared.post("Prompt copied — paste in Studio.")
-                } label: {
-                    Text("GENERATE → 15C")
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(1.4)
-                        .foregroundStyle(Palette.bronze)
-                        .padding(.horizontal, 8).padding(.vertical, 5)
-                        .overlay(Capsule().stroke(Palette.bronze, lineWidth: 1))
-                }
+            } else {
+                Text("NEW")
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .tracking(1.4)
+                    .foregroundStyle(Palette.muted)
             }
         }
         .padding(.vertical, 10)
+    }
+
+    // MARK: - Combo palette, render, generate
+
+    @ViewBuilder
+    private func paletteRow(_ hexes: [String]) -> some View {
+        HStack(spacing: 6) {
+            ForEach(hexes, id: \.self) { hex in
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Self.colorFromHex(hex) ?? Palette.muted.opacity(0.35))
+                    .frame(height: 26)
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Palette.hairline, lineWidth: 1))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func renderedLook(_ url: String) -> some View {
+        AsyncImage(url: URL(string: url)) { img in
+            img.resizable().scaledToFit()
+        } placeholder: {
+            Rectangle().fill(Palette.paper)
+                .frame(height: 180)
+                .overlay(ProgressView())
+        }
+        .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Palette.hairline, lineWidth: 1))
+    }
+
+    @ViewBuilder
+    private func generateButton(_ combo: OccasionCombo) -> some View {
+        let rendering = renderingId == combo.id
+        let done = renders[combo.id] != nil
+        Button {
+            Haptic.tap()
+            Task { await generate(combo) }
+        } label: {
+            Text(generateTitle(combo, rendering: rendering, done: done))
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(1.5)
+                .foregroundStyle(done ? Palette.muted : Palette.paper)
+                .padding(.horizontal, 14).padding(.vertical, 9)
+                .background(done ? Color.clear : Palette.ink)
+                .overlay(Capsule().stroke(done ? Palette.hairline : Color.clear, lineWidth: 1))
+                .clipShape(Capsule())
+        }
+        .disabled(rendering || done || renderingId != nil)
+    }
+
+    private func generateTitle(_ combo: OccasionCombo, rendering: Bool, done: Bool) -> String {
+        if done { return "GENERATED ✓" }
+        if rendering { return "GENERATING…" }
+        let n = combo.missingPieces.count
+        // Saying how many pieces are being made explains the price without a
+        // second line of copy — an all-closet combo reads as "just the stitch".
+        let what = n == 0 ? "STITCH" : "GENERATE \(n) PIECE\(n == 1 ? "" : "S")"
+        return "\(what) · \(combo.renderCost)C"
+    }
+
+    private func generate(_ combo: OccasionCombo) async {
+        guard renderingId == nil, renders[combo.id] == nil else { return }
+        let cost = combo.renderCost
+        let gate = await CreditsGate.check(cost)
+        guard case .ok = gate else {
+            if case .insufficientBalance = gate {
+                _ = CreditsGate.explainAndBlock(gate); onOpenPaywall()
+            } else {
+                _ = CreditsGate.explainAndBlock(gate)
+            }
+            return
+        }
+        renderingId = combo.id
+        renderErrors[combo.id] = nil
+        defer { renderingId = nil }
+        do {
+            let occasion = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            let out = try await OccasionCoachService.generateOutfit(combo: combo, occasion: occasion)
+            // Charged only once the images exist, so a failed render is free.
+            try? await Repo.shared.spendCredits(amount: cost, kind: "occasion_outfit")
+            renders[combo.id] = out.imageUrl
+            ToastBus.shared.post("Outfit ready — it is in your closet and Try On.")
+        } catch {
+            renderErrors[combo.id] = "Couldn't render that combo. \(error.localizedDescription)"
+        }
     }
 
     // MARK: - Actions
@@ -233,7 +338,7 @@ struct OccasionCoachView: View {
             // Weekly-free path skips the credit gate; paid path uses full gate.
             let useFree = freeAvailable
             if !useFree {
-                let gate = await CreditsGate.check(Supa.generateCost)
+                let gate = await CreditsGate.check(Supa.occasionCost)
                 if case .ok = gate {} else {
                     busy = false
                     if case .insufficientBalance = gate {
@@ -255,7 +360,7 @@ struct OccasionCoachView: View {
                     await OccasionCoachService.recordWeeklyFreeUse()
                     freeAvailable = false
                 } else {
-                    try? await Repo.shared.spendCredits(amount: Supa.generateCost, kind: "occasion_coach")
+                    try? await Repo.shared.spendCredits(amount: Supa.occasionCost, kind: "occasion_coach")
                 }
                 combos = result
                 busy = false

@@ -278,22 +278,57 @@ extension DecodePiece {
     }
 }
 
+/// One concrete alternative the wearer could put in, and what it changes.
+struct DecodeSwap: Decodable, Hashable {
+    var swap: String = ""
+    var why: String = ""
+}
+
 struct DecodeResponse: Decodable, Hashable {
     var pieces: [DecodePiece] = []
     var palette_hex: [String] = []
     var style_signature: String = ""
+    // v3 read. Every field is optional and defaults empty, so a client that
+    // gets a v2 response — or a v3 response the model only half filled — still
+    // renders everything it did before.
+    var palette_names: [String] = []
+    var signature_note: String = ""
+    var dress_code: String = ""
+    var mood_tags: [String] = []
+    var styling_notes: [String] = []
+    var make_it_yours: [DecodeSwap] = []
+    var where_it_works: [String] = []
     var error: String?
     var detail: String?
+
+    /// Colour name for a swatch, when the server sent names that line up with
+    /// the hexes. Positional by design — the server drops mismatched lists.
+    func paletteName(at index: Int) -> String? {
+        guard index < palette_names.count else { return nil }
+        let n = palette_names[index].trimmingCharacters(in: .whitespacesAndNewlines)
+        return n.isEmpty ? nil : n
+    }
 }
 
 extension DecodeResponse {
-    enum CodingKeys: String, CodingKey { case pieces, palette_hex, style_signature, error, detail }
+    enum CodingKeys: String, CodingKey {
+        case pieces, palette_hex, style_signature, palette_names, signature_note,
+             dress_code, mood_tags, styling_notes, make_it_yours, where_it_works,
+             error, detail
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         pieces = try c.decodeIfPresent([DecodePiece].self, forKey: .pieces) ?? []
         palette_hex = try c.decodeIfPresent([String].self, forKey: .palette_hex) ?? []
         style_signature = try c.decodeIfPresent(String.self, forKey: .style_signature) ?? ""
+        palette_names = try c.decodeIfPresent([String].self, forKey: .palette_names) ?? []
+        signature_note = try c.decodeIfPresent(String.self, forKey: .signature_note) ?? ""
+        dress_code = try c.decodeIfPresent(String.self, forKey: .dress_code) ?? ""
+        mood_tags = try c.decodeIfPresent([String].self, forKey: .mood_tags) ?? []
+        styling_notes = try c.decodeIfPresent([String].self, forKey: .styling_notes) ?? []
+        make_it_yours = try c.decodeIfPresent([DecodeSwap].self, forKey: .make_it_yours) ?? []
+        where_it_works = try c.decodeIfPresent([String].self, forKey: .where_it_works) ?? []
         error = try c.decodeIfPresent(String.self, forKey: .error)
         detail = try c.decodeIfPresent(String.self, forKey: .detail)
     }
