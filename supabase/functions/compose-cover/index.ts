@@ -1342,13 +1342,21 @@ function bandLuminance(img: any, y0: number, y1: number): number {
   return n === 0 ? 0.5 : total / n;
 }
 
-function buildBarcodeSVG(x: number, y: number, w: number, h: number, seed: string): string {
+// The barcode is a dozen filled rectangles, so it is painted directly onto the
+// canvas. It used to be built as SVG and handed to `Image.renderSVG`, which
+// rasterised a full 1080x1920 RGBA surface — two million pixels of work, and an
+// extra 8 MB allocation, to tint a 180x90 corner. That single call was a large
+// share of the worker's CPU budget and pushed real covers over the limit.
+function drawBarcode(canvas: any, H: number, seed: string): void {
   let s = 0;
   for (let i = 0; i < seed.length; i++) s = (s * 31 + seed.charCodeAt(i)) >>> 0;
   const rand = () => { s = (s * 1103515245 + 12345) >>> 0; return (s & 0x7fffffff) / 0x7fffffff; };
+
+  // White plate behind the bars, matching the old SVG's geometry.
+  canvas.drawBox(61, H - 169, 180, 90, hexToColor("#FFFFFF"));
+
+  const x = 72, y = H - 158, w = 156, h = 60;
   const bars = 12;
-  const parts: string[] = [];
-  let cx = x;
   const widths: number[] = [];
   let sum = 0;
   for (let i = 0; i < bars; i++) {
@@ -1357,21 +1365,16 @@ function buildBarcodeSVG(x: number, y: number, w: number, h: number, seed: strin
     sum += wi + 1;
   }
   const unit = w / sum;
+  const inkA = hexToColor("#000000");
+  const inkB = hexToColor("#111111");
+  let cx = x;
   for (let i = 0; i < bars; i++) {
     const bw = widths[i] * unit;
-    const fill = i % 3 === 0 ? "#000000" : "#111111";
-    parts.push(`<rect x="${cx.toFixed(2)}" y="${y}" width="${bw.toFixed(2)}" height="${h}" fill="${fill}"/>`);
+    const px = Math.round(cx);
+    const pw = Math.max(1, Math.round(bw));
+    canvas.drawBox(px + 1, y + 1, pw, h, i % 3 === 0 ? inkA : inkB);
     cx += bw + unit;
   }
-  return parts.join("");
-}
-
-function buildBarcodeOnlySVG(W: number, H: number, seed: string): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <rect x="60" y="${H - 170}" width="180" height="90" fill="#FFFFFF" fill-opacity="0.92" rx="4"/>
-  ${buildBarcodeSVG(72, H - 158, 156, 60, seed)}
-</svg>`;
 }
 
 function approxTextWidth(text: string, size: number, font: "serif" | "sans", tracking = 0): number {
@@ -1571,11 +1574,9 @@ async function renderFullCover(
 
   if (includeBarcode) {
     try {
-      const svg = buildBarcodeOnlySVG(W, H, barcodeSeed);
-      const overlay = Image.renderSVG(svg, 1, Image.SVG_MODE_SCALE);
-      canvas.composite(overlay, 0, 0);
+      drawBarcode(canvas, H, barcodeSeed);
     } catch (e) {
-      console.error("barcode_svg_failed:", String(e).slice(0, 200));
+      console.error("barcode_draw_failed:", String(e).slice(0, 200));
     }
   }
 
